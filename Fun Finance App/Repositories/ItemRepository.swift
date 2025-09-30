@@ -6,6 +6,7 @@ protocol ItemRepositoryProtocol {
     func addItem(title: String, price: Decimal, notes: String?, productText: String?, image: UIImage?) throws
     func items(for monthKey: String) throws -> [WantedItemEntity]
     func activeItems(for monthKey: String) throws -> [WantedItemEntity]
+    func allItems() throws -> [WantedItemEntity]
     func delete(_ item: WantedItemEntity) throws
     func restore(_ snapshot: ItemSnapshot) throws
     func makeSnapshot(from item: WantedItemEntity) -> ItemSnapshot
@@ -74,6 +75,12 @@ final class ItemRepository: ItemRepositoryProtocol {
             NSPredicate(format: "monthKey == %@", monthKey),
             NSPredicate(format: "statusRaw == %@", ItemStatus.active.rawValue)
         ])
+        return try context.fetch(request)
+    }
+
+    func allItems() throws -> [WantedItemEntity] {
+        let request = NSFetchRequest<WantedItemEntity>(entityName: "WantedItem")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \WantedItemEntity.createdAt, ascending: false)]
         return try context.fetch(request)
     }
 

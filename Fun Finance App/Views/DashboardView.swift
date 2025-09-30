@@ -40,7 +40,8 @@ struct DashboardView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .symbolRenderingMode(.palette)
-                            .foregroundStyle(Color.white, Color.accentColor)
+                            .foregroundStyle(Color.white, Color(red: 0.0, green: 0.6, blue: 0.35))
+                            .shadow(color: Color(red: 0.0, green: 0.45, blue: 0.28).opacity(0.4), radius: 6, x: 0, y: 4)
                     }
                     .accessibilityLabel("Add item")
 
@@ -121,7 +122,7 @@ private extension DashboardView {
     }
 
     var backgroundGradient: LinearGradient {
-        LinearGradient(colors: [Color(.systemBackground), Color.accentColor.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(colors: [Color(.systemGroupedBackground), Color(red: 0.9, green: 0.98, blue: 0.93)], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     var totalCard: some View {
@@ -151,17 +152,20 @@ private extension DashboardView {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            LinearGradient(colors: [Color.accentColor, Color.purple.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(colors: [Color(red: 0.02, green: 0.65, blue: 0.41), Color(red: 0.0, green: 0.5, blue: 0.33)], startPoint: .topLeading, endPoint: .bottomTrailing)
         )
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: Color.accentColor.opacity(0.3), radius: 12, x: 0, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: Color(red: 0.0, green: 0.5, blue: 0.33).opacity(0.35), radius: 14, x: 0, y: 10)
     }
 
     var statsRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 statPill(title: "Items logged", value: "\(viewModel.itemCount)", icon: "square.stack.3d.up")
-                statPill(title: "Undo available", value: viewModel.pendingUndoItem == nil ? "No" : "Yes", icon: "arrow.uturn.backward")
             }
             .padding(.horizontal, 4)
         }
@@ -171,9 +175,9 @@ private extension DashboardView {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color(red: 0.0, green: 0.6, blue: 0.35))
                 .padding(10)
-                .background(Color.accentColor.opacity(0.15))
+                .background(Color(red: 0.0, green: 0.6, blue: 0.35).opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
@@ -187,7 +191,7 @@ private extension DashboardView {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
-        .background(Color(.systemBackground).opacity(0.9))
+        .background(Color(.systemBackground).opacity(0.92))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 4)
     }

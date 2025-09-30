@@ -19,7 +19,6 @@ struct AppRootView: View {
     @State private var selectedTab: Tab = .dashboard
     @State private var lastNonAddTab: Tab = .dashboard
     @State private var closeoutSummary: MonthSummaryEntity?
-    @State private var historySelection: MonthSummaryDisplay?
     @State private var isLocked = false
     @State private var showingAddSheet = false
     @State private var showingSettings = false
@@ -28,7 +27,7 @@ struct AppRootView: View {
         self.container = container
         _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(itemRepository: container.itemRepository, imageStore: container.imageStore))
         _addItemViewModel = StateObject(wrappedValue: AddItemViewModel(itemRepository: container.itemRepository))
-        _historyViewModel = StateObject(wrappedValue: HistoryViewModel(monthRepository: container.monthRepository, imageStore: container.imageStore))
+        _historyViewModel = StateObject(wrappedValue: HistoryViewModel(monthRepository: container.monthRepository, itemRepository: container.itemRepository, imageStore: container.imageStore))
         _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(settingsRepository: container.settingsRepository, notificationScheduler: container.notificationScheduler, passcodeManager: container.passcodeManager))
         _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(passcodeManager: container.passcodeManager, settingsRepository: container.settingsRepository))
     }
@@ -46,9 +45,7 @@ struct AppRootView: View {
                 .tabItem { Label("Add", systemImage: "plus.circle.fill") }
                 .tag(Tab.add)
 
-            HistoryView(viewModel: historyViewModel, onSelectSummary: { summary in
-                historySelection = summary
-            })
+            HistoryView(viewModel: historyViewModel)
             .tabItem { Label("History", systemImage: "clock") }
             .tag(Tab.history)
 
@@ -56,11 +53,6 @@ struct AppRootView: View {
         .sheet(item: $closeoutSummary) { summary in
             MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary, haptics: container.hapticManager)) { item in
                 container.imageStore.loadImage(named: item.imagePath)
-            }
-        }
-        .sheet(item: $historySelection) { summary in
-            NavigationStack {
-                MonthDetailView(summary: summary, viewModel: historyViewModel)
             }
         }
         .sheet(isPresented: $showingSettings) {
