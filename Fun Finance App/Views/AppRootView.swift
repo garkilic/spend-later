@@ -5,7 +5,6 @@ struct AppRootView: View {
         case dashboard
         case add
         case history
-        case settings
     }
 
     let container: AppContainer
@@ -23,6 +22,7 @@ struct AppRootView: View {
     @State private var historySelection: MonthSummaryDisplay?
     @State private var isLocked = false
     @State private var showingAddSheet = false
+    @State private var showingSettings = false
 
     init(container: AppContainer) {
         self.container = container
@@ -37,7 +37,7 @@ struct AppRootView: View {
         TabView(selection: $selectedTab) {
             DashboardView(viewModel: dashboardViewModel,
                           addItemViewModel: addItemViewModel,
-                          onOpenSettings: { selectedTab = .settings },
+                          onOpenSettings: { showingSettings = true },
                           onShowCloseout: { Task { await checkRollover() } })
                 .tabItem { Label("Dashboard", systemImage: "house") }
                 .tag(Tab.dashboard)
@@ -52,9 +52,6 @@ struct AppRootView: View {
             .tabItem { Label("History", systemImage: "clock") }
             .tag(Tab.history)
 
-            SettingsView(viewModel: settingsViewModel)
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-                .tag(Tab.settings)
         }
         .sheet(item: $closeoutSummary) { summary in
             MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary, haptics: container.hapticManager)) { item in
@@ -64,6 +61,11 @@ struct AppRootView: View {
         .sheet(item: $historySelection) { summary in
             NavigationStack {
                 MonthDetailView(summary: summary, viewModel: historyViewModel)
+            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack {
+                SettingsView(viewModel: settingsViewModel)
             }
         }
         .sheet(isPresented: $showingAddSheet) {

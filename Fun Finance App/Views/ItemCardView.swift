@@ -29,8 +29,10 @@ struct ItemCardView: View {
                 .foregroundStyle(.secondary)
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(
+            LinearGradient(colors: [Color(.secondarySystemBackground), Color.accentColor.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(item.title), \(CurrencyFormatter.string(from: item.price))")
     }
