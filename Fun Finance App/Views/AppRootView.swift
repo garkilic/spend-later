@@ -25,9 +25,15 @@ struct AppRootView: View {
 
     init(container: AppContainer) {
         self.container = container
-        _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(itemRepository: container.itemRepository, imageStore: container.imageStore))
+        _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(itemRepository: container.itemRepository,
+                                                                           monthRepository: container.monthRepository,
+                                                                           settingsRepository: container.settingsRepository,
+                                                                           imageStore: container.imageStore))
         _addItemViewModel = StateObject(wrappedValue: AddItemViewModel(itemRepository: container.itemRepository))
-        _historyViewModel = StateObject(wrappedValue: HistoryViewModel(monthRepository: container.monthRepository, itemRepository: container.itemRepository, imageStore: container.imageStore))
+        _historyViewModel = StateObject(wrappedValue: HistoryViewModel(monthRepository: container.monthRepository,
+                                                                      itemRepository: container.itemRepository,
+                                                                      imageStore: container.imageStore,
+                                                                      settingsRepository: container.settingsRepository))
         _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(settingsRepository: container.settingsRepository, notificationScheduler: container.notificationScheduler, passcodeManager: container.passcodeManager))
         _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(passcodeManager: container.passcodeManager, settingsRepository: container.settingsRepository))
     }
@@ -37,29 +43,51 @@ struct AppRootView: View {
             DashboardView(viewModel: dashboardViewModel,
                           addItemViewModel: addItemViewModel,
                           onOpenSettings: { showingSettings = true },
-                          onShowCloseout: { Task { await checkRollover() } })
+                          onShowCloseout: { Task { await checkRollover() } },
+                          makeDetailViewModel: { item in
+                              ItemDetailViewModel(item: item,
+                                                  itemRepository: container.itemRepository,
+                                                  settingsRepository: container.settingsRepository)
+                          },
+                          makeReviewViewModel: {
+                              ReviewItemsViewModel(itemRepository: container.itemRepository,
+                                                   imageStore: container.imageStore,
+                                                   settingsRepository: container.settingsRepository)
+                          })
                 .tabItem { Label("Dashboard", systemImage: "house") }
                 .tag(Tab.dashboard)
 
             Color.clear
-                .tabItem {
-                    Label {
-                        Text("Add")
-                    } icon: {
-                        Image(systemName: "plus.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, addTabAccent)
-                    }
-                }
+                .tabItem { Label("Add", systemImage: "plus.circle.fill") }
                 .tag(Tab.add)
 
-            HistoryView(viewModel: historyViewModel)
+            HistoryView(viewModel: historyViewModel,
+                        makeDetailViewModel: { item in
+                            ItemDetailViewModel(item: item,
+                                                itemRepository: container.itemRepository,
+                                                settingsRepository: container.settingsRepository)
+                        },
+                        onItemDeleted: { _ in
+                            dashboardViewModel.refresh()
+                        })
                 .tabItem { Label("History", systemImage: "clock") }
                 .tag(Tab.history)
 
         }
+        .onChange(of: selectedTab) { oldValue, newValue in
+            if newValue == .add {
+                DispatchQueue.main.async {
+                    showingAddSheet = true
+                    selectedTab = lastNonAddTab
+                }
+            } else {
+                lastNonAddTab = newValue
+            }
+        }
         .sheet(item: $closeoutSummary) { summary in
-            MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary, haptics: container.hapticManager)) { item in
+            MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary,
+                                                                haptics: container.hapticManager,
+                                                                settingsRepository: container.settingsRepository)) { item in
                 container.imageStore.loadImage(named: item.imagePath)
             }
         }
@@ -91,22 +119,10 @@ struct AppRootView: View {
                 }
             }
         }
-        .onChange(of: selectedTab) { _, newValue in
-            if newValue == .add {
-                showingAddSheet = true
-                selectedTab = lastNonAddTab
-            } else {
-                lastNonAddTab = newValue
-            }
-        }
     }
 }
 
 private extension AppRootView {
-    var addTabAccent: Color {
-        Color(red: 0.02, green: 0.65, blue: 0.41)
-    }
-
     func checkRollover() async {
         do {
             if let summary = try container.rolloverService.evaluateIfNeeded() {

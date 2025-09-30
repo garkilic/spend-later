@@ -6,27 +6,35 @@ struct ItemCardView: View {
     let image: UIImage?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 140)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
-                    .cornerRadius(12)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.15))
-                    .frame(height: 140)
-                    .overlay(Text("No image").foregroundStyle(.secondary))
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.12))
+                        .overlay(
+                            Image(systemName: "sparkles.rectangle.stack")
+                                .font(.largeTitle)
+                                .foregroundStyle(Color.accentColor)
+                        )
+                }
             }
-            Text(item.title)
-                .font(.headline)
-                .lineLimit(1)
-            Text(CurrencyFormatter.string(from: item.price))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fill)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipped()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(CurrencyFormatter.string(from: item.priceWithTax))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .background(
@@ -40,7 +48,16 @@ struct ItemCardView: View {
 
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
-    let item = WantedItemDisplay(id: UUID(), title: "Fancy Jacket", price: 149.99, notes: "On sale", productText: "Brand X", productURL: nil, imagePath: "", status: .active, createdAt: Date())
+    let item = WantedItemDisplay(id: UUID(),
+                                 title: "Fancy Jacket",
+                                 price: 149.99,
+                                 priceWithTax: 162.44,
+                                 notes: "On sale",
+                                 tags: ["clothes", "sale"],
+                                 productURL: nil,
+                                 imagePath: "",
+                                 status: .active,
+                                 createdAt: Date())
     return ItemCardView(item: item, image: nil)
         .padding()
 }

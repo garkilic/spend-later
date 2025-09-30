@@ -7,7 +7,7 @@ final class AddItemViewModel: ObservableObject {
     @Published var title: String = ""
     @Published var price: Decimal = .zero
     @Published var notes: String = ""
-    @Published var productText: String = ""
+    @Published var tagsText: String = ""
     @Published var urlText: String = ""
     @Published var image: UIImage?
     @Published var previewImage: UIImage?
@@ -59,7 +59,7 @@ final class AddItemViewModel: ObservableObject {
         defer { isSaving = false }
         do {
             let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedProductText = productText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let parsedTags = normalizedTags()
             let storedProductURL = resolvedProductURL?.absoluteString ?? normalizedURL(from: urlText)?.absoluteString
             let imageToPersist = image ?? previewImage
             let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -67,7 +67,7 @@ final class AddItemViewModel: ObservableObject {
             try itemRepository.addItem(title: trimmedTitle,
                                        price: price,
                                        notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
-                                       productText: trimmedProductText.isEmpty ? nil : trimmedProductText,
+                                       tags: parsedTags,
                                        productURL: storedProductURL,
                                        image: imageToPersist)
             clear()
@@ -83,7 +83,7 @@ final class AddItemViewModel: ObservableObject {
         title = ""
         price = .zero
         notes = ""
-        productText = ""
+        tagsText = ""
         image = nil
         previewImage = nil
         urlText = ""
@@ -133,5 +133,12 @@ private extension AddItemViewModel {
         }
         components.fragment = nil
         return components.url
+    }
+
+    func normalizedTags() -> [String] {
+        tagsText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }

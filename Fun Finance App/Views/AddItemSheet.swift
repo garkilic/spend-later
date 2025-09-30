@@ -13,7 +13,7 @@ struct AddItemSheet: View {
         case title
         case price
         case notes
-        case product
+        case tags
     }
 
     init(viewModel: AddItemViewModel) {
@@ -23,8 +23,8 @@ struct AddItemSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                linkSection
                 photoSection
+                linkSection
                 detailsSection
                 if let error = viewModel.errorMessage {
                     Section {
@@ -170,8 +170,8 @@ private extension AddItemSheet {
             TextField("Notes (optional)", text: $viewModel.notes, axis: .vertical)
                 .lineLimit(3)
                 .focused($focusedField, equals: .notes)
-            TextField("Product reference (optional)", text: $viewModel.productText)
-                .focused($focusedField, equals: .product)
+            TextField("Tags (comma separated)", text: $viewModel.tagsText)
+                .focused($focusedField, equals: .tags)
         }
     }
 

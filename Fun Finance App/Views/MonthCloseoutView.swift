@@ -43,9 +43,8 @@ private extension MonthCloseoutView {
                 .font(.headline)
             ItemCardView(item: item, image: imageProvider(item))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green, lineWidth: 4))
-            if let productText = item.productText {
-                Text(productText)
-                    .font(.body)
+            if !item.tags.isEmpty {
+                TagListView(tags: item.tags)
             }
         }
         .padding()
@@ -122,6 +121,7 @@ private extension MonthCloseoutView {
     item1.title = "Sneakers"
     item1.price = NSDecimalNumber(value: 80)
     item1.imagePath = ""
+    item1.tags = ["style", "fitness"]
     item1.createdAt = Date()
     item1.monthKey = summary.monthKey
     item1.status = .active
@@ -131,13 +131,16 @@ private extension MonthCloseoutView {
     item2.title = "Headphones"
     item2.price = NSDecimalNumber(value: 40)
     item2.imagePath = ""
+    item2.tags = ["audio"]
     item2.createdAt = Date()
     item2.monthKey = summary.monthKey
     item2.status = .active
 
     summary.items = NSSet(array: [item1, item2])
 
-    return MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary, haptics: container.hapticManager)) { _ in
+    return MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary,
+                                                               haptics: container.hapticManager,
+                                                               settingsRepository: container.settingsRepository)) { _ in
         nil
     }
 }

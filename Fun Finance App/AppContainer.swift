@@ -39,7 +39,7 @@ final class AppContainer: ObservableObject {
             passcodeManager.setActiveKey(settings.passcodeKeychainKey)
             notificationScheduler.requestAuthorizationIfNeeded()
             notificationScheduler.updateWeeklyReminder(enabled: settings.weeklyReminderEnabled)
-            notificationScheduler.updateMonthlyReminder(enabled: settings.monthlyReminderEnabled)
+            notificationScheduler.cancelMonthlyReminder()
         } catch {
             assertionFailure("Failed to load settings: \(error)")
         }

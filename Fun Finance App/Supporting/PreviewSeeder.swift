@@ -20,9 +20,10 @@ enum PreviewSeeder {
             item.title = "Preview Item \(index + 1)"
             item.price = NSDecimalNumber(value: 29.99 + Double(index) * 10)
             item.notes = "Quick note \(index + 1)"
-            item.productText = "Product ref #\(index + 1)"
+            item.productText = nil
             item.productURL = nil
             item.imagePath = ""
+            item.tags = ["preview", "habit \(index + 1)"]
             item.createdAt = now
             item.monthKey = currentKey
             item.statusRaw = ItemStatus.active.rawValue
@@ -40,9 +41,10 @@ enum PreviewSeeder {
         settings.id = UUID()
         settings.currencyCode = "USD"
         settings.weeklyReminderEnabled = true
-        settings.monthlyReminderEnabled = true
+        settings.monthlyReminderEnabled = false
         settings.passcodeEnabled = false
         settings.passcodeKeychainKey = nil
+        settings.taxRate = .zero
 
         try? context.save()
     }

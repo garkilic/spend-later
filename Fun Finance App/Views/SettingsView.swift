@@ -15,7 +15,21 @@ struct SettingsView: View {
             Form {
                 Section("Reminders") {
                     Toggle("Weekly temptation reminder", isOn: Binding(get: { viewModel.weeklyReminderEnabled }, set: { viewModel.toggleWeeklyReminder($0) }))
-                    Toggle("Monthly draw reminder", isOn: Binding(get: { viewModel.monthlyReminderEnabled }, set: { viewModel.toggleMonthlyReminder($0) }))
+                }
+
+                Section("Pricing") {
+                    HStack {
+                        Text("Tax rate")
+                        Spacer()
+                        TextField("0", value: $viewModel.taxRatePercent, format: .number.precision(.fractionLength(0...2)))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                        Text("%")
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("Totals use this rate on top of base prices.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Passcode") {

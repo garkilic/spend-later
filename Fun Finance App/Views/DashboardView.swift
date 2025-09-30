@@ -4,17 +4,26 @@ struct DashboardView: View {
     @StateObject private var viewModel: DashboardViewModel
     @StateObject private var addItemViewModel: AddItemViewModel
     @State private var showingAddSheet = false
+    @State private var selectedItem: WantedItemDisplay?
+    @State private var showingSummary = false
+    @State private var showingReview = false
     let onOpenSettings: () -> Void
     let onShowCloseout: () -> Void
+    let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
+    let makeReviewViewModel: () -> ReviewItemsViewModel
 
     init(viewModel: DashboardViewModel,
          addItemViewModel: AddItemViewModel,
          onOpenSettings: @escaping () -> Void,
-         onShowCloseout: @escaping () -> Void) {
+         onShowCloseout: @escaping () -> Void,
+         makeDetailViewModel: @escaping (WantedItemDisplay) -> ItemDetailViewModel,
+         makeReviewViewModel: @escaping () -> ReviewItemsViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
         _addItemViewModel = StateObject(wrappedValue: addItemViewModel)
         self.onOpenSettings = onOpenSettings
         self.onShowCloseout = onShowCloseout
+        self.makeDetailViewModel = makeDetailViewModel
+        self.makeReviewViewModel = makeReviewViewModel
     }
 
     var body: some View {
@@ -35,16 +44,6 @@ struct DashboardView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(Color.white, Color(red: 0.0, green: 0.6, blue: 0.35))
-                            .shadow(color: Color(red: 0.0, green: 0.45, blue: 0.28).opacity(0.4), radius: 6, x: 0, y: 4)
-                    }
-                    .accessibilityLabel("Add item")
-
                     Button(action: onOpenSettings) {
                         Image(systemName: "gearshape.fill")
                     }
@@ -54,6 +53,20 @@ struct DashboardView: View {
             .overlay(undoBanner, alignment: .bottom)
             .sheet(isPresented: $showingAddSheet) {
                 AddItemSheet(viewModel: addItemViewModel)
+            }
+            .sheet(item: $selectedItem) { item in
+                detailSheet(for: item)
+            }
+            .sheet(isPresented: $showingSummary) {
+                YearlySummaryView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showingReview) {
+                ReviewItemsView(viewModel: makeReviewViewModel())
+            }
+            .onChange(of: showingAddSheet) { isPresented in
+                if !isPresented {
+                    viewModel.refresh()
+                }
             }
             .onAppear { viewModel.refresh() }
         }
@@ -91,6 +104,8 @@ private extension DashboardView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
                     ForEach(viewModel.items) { item in
                         ItemCardView(item: item, image: viewModel.image(for: item))
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedItem = item }
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
                                     viewModel.delete(item)
@@ -126,29 +141,37 @@ private extension DashboardView {
     }
 
     var totalCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Total saved")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Money banked this month")
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(.white.opacity(0.85))
 
             Text(CurrencyFormatter.string(from: viewModel.totalSaved))
                 .font(.system(size: 46, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .minimumScaleFactor(0.5)
 
-            if viewModel.canReviewLastMonth {
-                Button {
-                    onShowCloseout()
-                } label: {
-                    Label("Review last month", systemImage: "sparkles")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Color.white.opacity(0.18))
-                        .clipShape(Capsule())
+            HStack(spacing: 12) {
+                if viewModel.canReviewLastMonth {
+                    Button {
+                        onShowCloseout()
+                    } label: {
+                        Label("Review last month", systemImage: "sparkles")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.18))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
+
+                Spacer()
+
+                Label("Past year", systemImage: "chart.line.uptrend.xyaxis")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
             }
         }
         .padding(24)
@@ -162,12 +185,20 @@ private extension DashboardView {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: Color(red: 0.0, green: 0.5, blue: 0.33).opacity(0.35), radius: 14, x: 0, y: 10)
+        .contentShape(Rectangle())
+        .onTapGesture { showingSummary = true }
     }
 
     var statsRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 statPill(title: "Items logged", value: "\(viewModel.itemCount)", icon: "square.stack.3d.up")
+                Button {
+                    showingReview = true
+                } label: {
+                    statPill(title: "Needs review", value: "\(viewModel.reviewCount)", icon: "hand.raised")
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 4)
         }
@@ -199,12 +230,40 @@ private extension DashboardView {
     }
 }
 
+private extension DashboardView {
+    func detailSheet(for item: WantedItemDisplay) -> some View {
+        let detailViewModel = makeDetailViewModel(item)
+        return ItemDetailView(viewModel: detailViewModel,
+                              imageProvider: { viewModel.image(for: $0) }) { deleted in
+            viewModel.delete(deleted)
+            selectedItem = nil
+        } onUpdate: { updated in
+            selectedItem = updated
+            viewModel.refresh()
+        }
+    }
+}
+
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
     let container = PreviewSupport.container
-    return DashboardView(viewModel: DashboardViewModel(itemRepository: container.itemRepository, imageStore: container.imageStore),
+    let dashboardVM = DashboardViewModel(itemRepository: container.itemRepository,
+                                         monthRepository: container.monthRepository,
+                                         settingsRepository: container.settingsRepository,
+                                         imageStore: container.imageStore)
+    return DashboardView(viewModel: dashboardVM,
                          addItemViewModel: AddItemViewModel(itemRepository: container.itemRepository),
                          onOpenSettings: {},
-                         onShowCloseout: {})
+                         onShowCloseout: {},
+                         makeDetailViewModel: { item in
+                             ItemDetailViewModel(item: item,
+                                                 itemRepository: container.itemRepository,
+                                                 settingsRepository: container.settingsRepository)
+                         },
+                         makeReviewViewModel: {
+                             ReviewItemsViewModel(itemRepository: container.itemRepository,
+                                                  imageStore: container.imageStore,
+                                                  settingsRepository: container.settingsRepository)
+                         })
 }
 #endif

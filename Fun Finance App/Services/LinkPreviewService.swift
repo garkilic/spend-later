@@ -45,7 +45,7 @@ final class LinkPreviewService: LinkPreviewServicing {
 
 private extension LinkPreviewService {
     func normalize(urlString: String) throws -> URL {
-        var trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = urlString.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw LinkPreviewError.invalidURL }
         if !trimmed.contains("://") {
             trimmed = "https://" + trimmed
@@ -68,7 +68,7 @@ private extension LinkPreviewService {
 
     func fetchUsingMetadataProvider(for url: URL) async throws -> LinkPreviewMetadata {
         let provider = LPMetadataProvider()
-        let metadata = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<LPLinkMetadata, Error>) in
+        let metadata: LPLinkMetadata = try await withCheckedThrowingContinuation { continuation in
             provider.startFetchingMetadata(for: url) { metadata, error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -92,7 +92,7 @@ private extension LinkPreviewService {
 
     func loadImage(from provider: NSItemProvider?) async -> UIImage? {
         guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return nil }
-        return await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
             provider.loadObject(ofClass: UIImage.self) { object, _ in
                 continuation.resume(returning: object as? UIImage)
             }
@@ -117,7 +117,7 @@ private extension LinkPreviewService {
 
     func parseTitle(in html: String) -> String? {
         if let metaTitle = parseMetaContent(in: html, keys: ["og:title", "twitter:title"]) {
-            return metaTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            return metaTitle.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         }
 
         guard let range = html.range(of: "<title>", options: [.caseInsensitive]) else {
@@ -127,7 +127,7 @@ private extension LinkPreviewService {
         guard let closeRange = lower.range(of: "</title>", options: [.caseInsensitive]) else {
             return nil
         }
-        return String(lower[..<closeRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(lower[..<closeRange.lowerBound]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
     func parseMetaContent(in html: String, keys: [String]) -> String? {

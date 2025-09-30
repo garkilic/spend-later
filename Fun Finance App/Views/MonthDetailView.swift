@@ -26,7 +26,7 @@ struct MonthDetailView: View {
         List {
             Section("Summary") {
                 HStack {
-                    Text("Total saved")
+                    Text("Money banked")
                     Spacer()
                     Text(CurrencyFormatter.string(from: summary.totalSaved))
                 }
@@ -62,9 +62,17 @@ struct MonthDetailView: View {
                         VStack(alignment: .leading) {
                             Text(item.title)
                                 .font(.headline)
-                            Text(CurrencyFormatter.string(from: item.price))
+                            Text(CurrencyFormatter.string(from: item.priceWithTax))
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.accentColor)
+                            if item.priceWithTax != item.price {
+                                Text("Base: \(CurrencyFormatter.string(from: item.price))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !item.tags.isEmpty {
+                                TagListView(tags: item.tags)
+                            }
                         }
                         Spacer()
                         if let image = viewModel.image(for: item) {
@@ -87,7 +95,11 @@ struct MonthDetailView: View {
     let container = PreviewSupport.container
     let summary = MonthSummaryDisplay(id: UUID(), monthKey: "2025,08", totalSaved: 200, itemCount: 3, winnerItemId: nil, closedAt: nil)
     return NavigationStack {
-        MonthDetailView(summary: summary, viewModel: HistoryViewModel(monthRepository: container.monthRepository, imageStore: container.imageStore))
+        MonthDetailView(summary: summary,
+                        viewModel: HistoryViewModel(monthRepository: container.monthRepository,
+                                                    itemRepository: container.itemRepository,
+                                                    imageStore: container.imageStore,
+                                                    settingsRepository: container.settingsRepository))
     }
 }
 #endif

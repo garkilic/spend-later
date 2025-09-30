@@ -8,4 +8,5 @@ final class AppSettingsEntity: NSManagedObject {
     @NSManaged var monthlyReminderEnabled: Bool
     @NSManaged var passcodeEnabled: Bool
     @NSManaged var passcodeKeychainKey: String?
+    @NSManaged var taxRate: NSDecimalNumber
 }

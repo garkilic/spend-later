@@ -3,7 +3,7 @@ import UIKit
 
 protocol ItemRepositoryProtocol {
     var currentMonthKey: String { get }
-    func addItem(title: String, price: Decimal, notes: String?, productText: String?, productURL: String?, image: UIImage?) throws
+    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) throws
     func items(for monthKey: String) throws -> [WantedItemEntity]
     func activeItems(for monthKey: String) throws -> [WantedItemEntity]
     func allItems() throws -> [WantedItemEntity]
@@ -12,6 +12,7 @@ protocol ItemRepositoryProtocol {
     func makeSnapshot(from item: WantedItemEntity) -> ItemSnapshot
     func monthKey(for date: Date) -> String
     func item(with id: UUID) throws -> WantedItemEntity?
+    func updateItem(id: UUID, title: String, notes: String?, tags: [String], productURL: String?) throws
 }
 
 struct ItemSnapshot {
@@ -19,7 +20,7 @@ struct ItemSnapshot {
     let title: String
     let price: Decimal
     let notes: String?
-    let productText: String?
+    let tags: [String]
     let productURL: String?
     let imagePath: String
     let createdAt: Date
@@ -45,7 +46,7 @@ final class ItemRepository: ItemRepositoryProtocol {
         monthKey(for: Date())
     }
 
-    func addItem(title: String, price: Decimal, notes: String?, productText: String?, productURL: String?, image: UIImage?) throws {
+    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) throws {
         let filename: String
         if let image {
             filename = try imageStore.save(image: image)
@@ -57,9 +58,10 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.title = title
         item.price = NSDecimalNumber(decimal: price)
         item.notes = notes
-        item.productText = productText
+        item.productText = nil
         item.productURL = productURL
         item.imagePath = filename
+        item.tags = tags
         item.createdAt = Date()
         item.monthKey = monthKey(for: item.createdAt)
         item.status = .active
@@ -97,9 +99,10 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.title = snapshot.title
         item.price = NSDecimalNumber(decimal: snapshot.price)
         item.notes = snapshot.notes
-        item.productText = snapshot.productText
+        item.productText = nil
         item.productURL = snapshot.productURL
         item.imagePath = snapshot.imagePath
+        item.tags = snapshot.tags
         item.createdAt = snapshot.createdAt
         item.monthKey = snapshot.monthKey
         item.status = snapshot.status
@@ -111,7 +114,7 @@ final class ItemRepository: ItemRepositoryProtocol {
                      title: item.title,
                      price: item.price.decimalValue,
                      notes: item.notes,
-                     productText: item.productText,
+                     tags: item.tags,
                      productURL: item.productURL,
                      imagePath: item.imagePath,
                      createdAt: item.createdAt,
@@ -128,6 +131,16 @@ final class ItemRepository: ItemRepositoryProtocol {
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         request.fetchLimit = 1
         return try context.fetch(request).first
+    }
+
+    func updateItem(id: UUID, title: String, notes: String?, tags: [String], productURL: String?) throws {
+        guard let entity = try item(with: id) else { return }
+        entity.title = title
+        entity.notes = notes
+        entity.tags = tags
+        entity.productURL = productURL
+        entity.productText = nil
+        try saveIfNeeded()
     }
 }
 

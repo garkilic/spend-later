@@ -12,11 +12,16 @@ final class MonthCloseoutViewModel: ObservableObject {
     private let summary: MonthSummaryEntity
     private let context: NSManagedObjectContext
     private let haptics: HapticManager
+    private let settingsRepository: SettingsRepositoryProtocol
+    private var taxRate: Decimal = .zero
 
-    init(summary: MonthSummaryEntity, haptics: HapticManager) {
+    init(summary: MonthSummaryEntity,
+         haptics: HapticManager,
+         settingsRepository: SettingsRepositoryProtocol) {
         self.summary = summary
         self.context = summary.managedObjectContext ?? PersistenceController.shared.container.viewContext
         self.haptics = haptics
+        self.settingsRepository = settingsRepository
         reload()
     }
 
@@ -29,25 +34,32 @@ final class MonthCloseoutViewModel: ObservableObject {
     }
 
     func reload() {
+        taxRate = (try? settingsRepository.loadAppSettings().taxRate.decimalValue) ?? .zero
         let entities = summary.wantedItems
         items = entities.map { entity in
-            WantedItemDisplay(id: entity.id,
-                              title: entity.title,
-                              price: entity.price.decimalValue,
-                              notes: entity.notes,
-                              productText: entity.productText,
-                              productURL: entity.productURL,
-                              imagePath: entity.imagePath,
-                              status: entity.status,
-                              createdAt: entity.createdAt)
+            let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
+            let basePrice = entity.price.decimalValue
+            return WantedItemDisplay(id: entity.id,
+                                     title: entity.title,
+                                     price: basePrice,
+                                     priceWithTax: includeTax(on: basePrice),
+                                     notes: entity.notes,
+                                     tags: tags,
+                                     productURL: entity.productURL,
+                                     imagePath: entity.imagePath,
+                                     status: entity.status,
+                                     createdAt: entity.createdAt)
         }
         if let winnerId = summary.winnerItemId,
            let winnerEntity = entities.first(where: { $0.id == winnerId }) {
+            let winnerTags = winnerEntity.tags.isEmpty ? (winnerEntity.productText.map { [$0] } ?? []) : winnerEntity.tags
+            let winnerPrice = winnerEntity.price.decimalValue
             winner = WantedItemDisplay(id: winnerEntity.id,
                                        title: winnerEntity.title,
-                                       price: winnerEntity.price.decimalValue,
+                                       price: winnerPrice,
+                                       priceWithTax: includeTax(on: winnerPrice),
                                        notes: winnerEntity.notes,
-                                       productText: winnerEntity.productText,
+                                       tags: winnerTags,
                                        productURL: winnerEntity.productURL,
                                        imagePath: winnerEntity.imagePath,
                                        status: winnerEntity.status,
@@ -79,5 +91,13 @@ final class MonthCloseoutViewModel: ObservableObject {
         } catch {
             assertionFailure("Failed to save draw: \(error)")
         }
+    }
+
+    private func includeTax(on amount: Decimal) -> Decimal {
+        guard taxRate > 0 else { return amount }
+        var result = amount
+        let multiplier = Decimal(1) + taxRate
+        result *= multiplier
+        return result
     }
 }

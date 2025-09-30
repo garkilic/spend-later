@@ -45,8 +45,9 @@ final class PersistenceController {
 private enum ModelVersion: String {
     case v1 = "SpendLaterModelV1"
     case v2 = "SpendLaterModelV2"
+    case v3 = "SpendLaterModelV3"
 
-    static var current: ModelVersion { .v2 }
+    static var current: ModelVersion { .v3 }
 }
 
 private extension PersistenceController {
@@ -111,12 +112,20 @@ private extension PersistenceController {
         productText.isOptional = true
         properties.append(productText)
 
-        if version == .v2 {
+        if version != .v1 {
             let productURL = NSAttributeDescription()
             productURL.name = "productURL"
             productURL.attributeType = .stringAttributeType
             productURL.isOptional = true
             properties.append(productURL)
+        }
+
+        if version == .v3 {
+            let tagsRaw = NSAttributeDescription()
+            tagsRaw.name = "tagsRaw"
+            tagsRaw.attributeType = .stringAttributeType
+            tagsRaw.isOptional = true
+            properties.append(tagsRaw)
         }
 
         let imagePath = NSAttributeDescription()
@@ -242,6 +251,13 @@ private extension PersistenceController {
         monthlyReminderEnabled.isOptional = false
         monthlyReminderEnabled.defaultValue = true
         properties.append(monthlyReminderEnabled)
+
+        let taxRate = NSAttributeDescription()
+        taxRate.name = "taxRate"
+        taxRate.attributeType = .decimalAttributeType
+        taxRate.isOptional = false
+        taxRate.defaultValue = NSDecimalNumber.zero
+        properties.append(taxRate)
 
         let passcodeEnabled = NSAttributeDescription()
         passcodeEnabled.name = "passcodeEnabled"

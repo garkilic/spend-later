@@ -9,25 +9,38 @@ final class DashboardViewModel: ObservableObject {
     @Published var itemCount: Int = 0
     @Published var pendingUndoItem: WantedItemDisplay?
     @Published var canReviewLastMonth: Bool = false
+    @Published var yearlyTotals: [MonthlyTrendPoint] = []
+    @Published var reviewCount: Int = 0
 
     private let itemRepository: ItemRepositoryProtocol
+    private let monthRepository: MonthRepositoryProtocol
+    private let settingsRepository: SettingsRepositoryProtocol
     private let imageStore: ImageStoring
     private var pendingDeletion: (snapshot: ItemSnapshot, workItem: DispatchWorkItem)?
     private let calendar: Calendar
+    private var taxRate: Decimal = .zero
 
     init(itemRepository: ItemRepositoryProtocol,
+         monthRepository: MonthRepositoryProtocol,
+         settingsRepository: SettingsRepositoryProtocol,
          imageStore: ImageStoring,
          calendar: Calendar = .current) {
         self.itemRepository = itemRepository
+        self.monthRepository = monthRepository
+        self.settingsRepository = settingsRepository
         self.imageStore = imageStore
         self.calendar = calendar
     }
 
     func refresh() {
         do {
+            try reloadTaxRate()
             let items = try itemRepository.items(for: itemRepository.currentMonthKey)
-            apply(items: items)
+            let displays = makeDisplays(from: items)
+            apply(displays: displays)
             updateReviewAvailability()
+            try updateYearlyTotals(currentMonthDisplays: displays)
+            updateReviewCount()
         } catch {
             assertionFailure("Failed to fetch items: \(error)")
         }
@@ -64,20 +77,26 @@ final class DashboardViewModel: ObservableObject {
 }
 
 private extension DashboardViewModel {
-    func apply(items: [WantedItemEntity]) {
-        let displays = items.map { entity in
-            WantedItemDisplay(id: entity.id,
-                              title: entity.title,
-                              price: entity.price.decimalValue,
-                              notes: entity.notes,
-                              productText: entity.productText,
-                              productURL: entity.productURL,
-                              imagePath: entity.imagePath,
-                              status: entity.status,
-                              createdAt: entity.createdAt)
+    func makeDisplays(from items: [WantedItemEntity]) -> [WantedItemDisplay] {
+        items.map { entity in
+            let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
+            let basePrice = entity.price.decimalValue
+            return WantedItemDisplay(id: entity.id,
+                                     title: entity.title,
+                                     price: basePrice,
+                                     priceWithTax: includeTax(on: basePrice),
+                                     notes: entity.notes,
+                                     tags: tags,
+                                     productURL: entity.productURL,
+                                     imagePath: entity.imagePath,
+                                     status: entity.status,
+                                     createdAt: entity.createdAt)
         }
+    }
+
+    func apply(displays: [WantedItemDisplay]) {
         self.items = displays
-        totalSaved = displays.reduce(.zero) { $0 + $1.price }
+        totalSaved = displays.reduce(.zero) { $0 + $1.priceWithTax }
         itemCount = displays.count
     }
 
@@ -96,12 +115,28 @@ private extension DashboardViewModel {
         }
     }
 
+    func updateReviewCount() {
+        guard let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: Date()) else {
+            reviewCount = 0
+            return
+        }
+
+        let key = itemRepository.monthKey(for: previousMonthDate)
+        do {
+            let previousItems = try itemRepository.items(for: key)
+            reviewCount = previousItems.filter { $0.status == .active }.count
+        } catch {
+            reviewCount = 0
+        }
+    }
+
     func scheduleUndo(for snapshot: ItemSnapshot) {
         let display = WantedItemDisplay(id: snapshot.id,
                                          title: snapshot.title,
                                          price: snapshot.price,
+                                         priceWithTax: includeTax(on: snapshot.price),
                                          notes: snapshot.notes,
-                                         productText: snapshot.productText,
+                                         tags: snapshot.tags,
                                          productURL: snapshot.productURL,
                                          imagePath: snapshot.imagePath,
                                          status: snapshot.status,
@@ -115,5 +150,51 @@ private extension DashboardViewModel {
         }
         pendingDeletion = (snapshot, workItem)
         DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+    }
+
+    func includeTax(on amount: Decimal) -> Decimal {
+        guard taxRate > 0 else { return amount }
+        var result = amount
+        let multiplier = Decimal(1) + taxRate
+        result *= multiplier
+        return result
+    }
+
+    func reloadTaxRate() throws {
+        let settings = try settingsRepository.loadAppSettings()
+        taxRate = settings.taxRate.decimalValue
+    }
+
+    func updateYearlyTotals(currentMonthDisplays: [WantedItemDisplay]) throws {
+        let summaries = try monthRepository.summaries()
+        let summaryMap = Dictionary(uniqueKeysWithValues: summaries.map { ($0.monthKey, $0) })
+        var points: [MonthlyTrendPoint] = []
+        let now = Date()
+
+        for offset in (0..<12).reversed() {
+            guard let date = calendar.date(byAdding: .month, value: -offset, to: now) else { continue }
+            let key = itemRepository.monthKey(for: date)
+            let baseTotal: Decimal
+            if key == itemRepository.currentMonthKey {
+                baseTotal = currentMonthDisplays.reduce(.zero) { $0 + $1.price }
+            } else if let summary = summaryMap[key] {
+                baseTotal = summary.totalSaved.decimalValue
+            } else {
+                baseTotal = .zero
+            }
+            let totalWithTax = includeTax(on: baseTotal)
+            guard let normalizedDate = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) else { continue }
+            points.append(MonthlyTrendPoint(id: key, monthKey: key, date: normalizedDate, total: totalWithTax))
+        }
+        yearlyTotals = points
+    }
+}
+
+extension DashboardViewModel {
+    struct MonthlyTrendPoint: Identifiable {
+        let id: String
+        let monthKey: String
+        let date: Date
+        let total: Decimal
     }
 }

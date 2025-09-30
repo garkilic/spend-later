@@ -4,7 +4,7 @@ import UserNotifications
 protocol NotificationScheduling {
     func requestAuthorizationIfNeeded()
     func updateWeeklyReminder(enabled: Bool)
-    func updateMonthlyReminder(enabled: Bool)
+    func cancelMonthlyReminder()
 }
 
 final class NotificationScheduler: NotificationScheduling {
@@ -43,24 +43,10 @@ final class NotificationScheduler: NotificationScheduling {
         }
     }
 
-    func updateMonthlyReminder(enabled: Bool) {
+    func cancelMonthlyReminder() {
         queue.async {
             let identifier = "monthly-draw-reminder"
             self.center.removePendingNotificationRequests(withIdentifiers: [identifier])
-            guard enabled else { return }
-
-            var dateComponents = DateComponents()
-            dateComponents.day = 1
-            dateComponents.hour = 9
-
-            let content = UNMutableNotificationContent()
-            content.title = "Reward draw"
-            content.body = "Review last month and pick your reward."
-            content.sound = .default
-
-            let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-            self.center.add(request)
         }
     }
 }
