@@ -101,9 +101,10 @@ private extension DashboardView {
                     .buttonStyle(.borderedProminent)
                 }
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(viewModel.items) { item in
                         ItemCardView(item: item, image: viewModel.image(for: item))
+                            .frame(maxWidth: .infinity)
                             .contentShape(Rectangle())
                             .onTapGesture { selectedItem = item }
                             .swipeActions(edge: .trailing) {

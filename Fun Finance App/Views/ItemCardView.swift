@@ -23,7 +23,7 @@ struct ItemCardView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .aspectRatio(1, contentMode: .fill)
+            .frame(height: 180)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .clipped()
 
