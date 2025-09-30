@@ -21,6 +21,7 @@ enum PreviewSeeder {
             item.price = NSDecimalNumber(value: 29.99 + Double(index) * 10)
             item.notes = "Quick note \(index + 1)"
             item.productText = "Product ref #\(index + 1)"
+            item.productURL = nil
             item.imagePath = ""
             item.createdAt = now
             item.monthKey = currentKey

@@ -9,6 +9,7 @@ struct AddItemSheet: View {
     @FocusState private var focusedField: Field?
 
     enum Field {
+        case url
         case title
         case price
         case notes
@@ -22,6 +23,7 @@ struct AddItemSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                linkSection
                 photoSection
                 detailsSection
                 if let error = viewModel.errorMessage {
@@ -60,11 +62,50 @@ struct AddItemSheet: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
+            .onChange(of: focusedField) { oldValue, newValue in
+                if oldValue == .url, newValue != .url {
+                    viewModel.requestLinkPreview()
+                }
+            }
         }
     }
 }
 
 private extension AddItemSheet {
+    var linkSection: some View {
+        Section("Product URL") {
+            if let preview = viewModel.previewImage {
+                Image(uiImage: preview)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 180)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .clipped()
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+            }
+
+            TextField("https://example.com/product", text: $viewModel.urlText)
+                .keyboardType(.URL)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .focused($focusedField, equals: .url)
+                .submitLabel(.done)
+                .onSubmit { viewModel.requestLinkPreview() }
+
+            if viewModel.isFetchingPreview {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                    Text("Fetching preview…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     var photoSection: some View {
         Section("Photo") {
         VStack(alignment: .center, spacing: 12) {

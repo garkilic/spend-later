@@ -8,18 +8,46 @@ final class AddItemViewModel: ObservableObject {
     @Published var price: Decimal = .zero
     @Published var notes: String = ""
     @Published var productText: String = ""
+    @Published var urlText: String = ""
     @Published var image: UIImage?
+    @Published var previewImage: UIImage?
     @Published var isSaving: Bool = false
+    @Published var isFetchingPreview: Bool = false
     @Published var errorMessage: String?
 
     private let itemRepository: ItemRepositoryProtocol
+    private let linkPreviewService: LinkPreviewServicing
+    private var resolvedProductURL: URL?
+    private var previewTask: Task<Void, Never>?
 
-    init(itemRepository: ItemRepositoryProtocol) {
+    init(itemRepository: ItemRepositoryProtocol,
+         linkPreviewService: LinkPreviewServicing? = nil) {
         self.itemRepository = itemRepository
+        self.linkPreviewService = linkPreviewService ?? LinkPreviewService()
     }
 
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && price > 0
+    }
+
+    deinit {
+        previewTask?.cancel()
+    }
+
+    func requestLinkPreview() {
+        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        previewTask?.cancel()
+
+        guard !trimmed.isEmpty else {
+            resolvedProductURL = nil
+            previewImage = nil
+            return
+        }
+
+        previewTask = Task { [weak self] in
+            guard let self else { return }
+            await self.loadPreview(for: trimmed)
+        }
     }
 
     func save() async -> Bool {
@@ -30,11 +58,18 @@ final class AddItemViewModel: ObservableObject {
         isSaving = true
         defer { isSaving = false }
         do {
-            try itemRepository.addItem(title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedProductText = productText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let storedProductURL = resolvedProductURL?.absoluteString ?? normalizedURL(from: urlText)?.absoluteString
+            let imageToPersist = image ?? previewImage
+            let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            try itemRepository.addItem(title: trimmedTitle,
                                        price: price,
-                                       notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
-                                       productText: productText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : productText,
-                                       image: image)
+                                       notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                                       productText: trimmedProductText.isEmpty ? nil : trimmedProductText,
+                                       productURL: storedProductURL,
+                                       image: imageToPersist)
             clear()
             return true
         } catch {
@@ -44,11 +79,59 @@ final class AddItemViewModel: ObservableObject {
     }
 
     func clear() {
+        previewTask?.cancel()
         title = ""
         price = .zero
         notes = ""
         productText = ""
         image = nil
+        previewImage = nil
+        urlText = ""
+        resolvedProductURL = nil
+        isFetchingPreview = false
         errorMessage = nil
+    }
+}
+
+private extension AddItemViewModel {
+    func loadPreview(for urlString: String) async {
+        isFetchingPreview = true
+        defer {
+            isFetchingPreview = false
+            previewTask = nil
+        }
+
+        do {
+            let metadata = try await linkPreviewService.fetchMetadata(for: urlString)
+            guard !Task.isCancelled else { return }
+            resolvedProductURL = metadata.normalizedURL
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let fetchedTitle = metadata.title,
+               !fetchedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                title = fetchedTitle
+            }
+            previewImage = metadata.image ?? metadata.icon
+        } catch {
+            guard !Task.isCancelled else { return }
+            resolvedProductURL = normalizedURL(from: urlString)
+            previewImage = nil
+        }
+    }
+
+    func normalizedURL(from text: String) -> URL? {
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if !trimmed.contains("://") {
+            trimmed = "https://" + trimmed
+        }
+        guard var components = URLComponents(string: trimmed) else { return nil }
+        if components.scheme == nil {
+            components.scheme = "https"
+        }
+        if let host = components.host {
+            components.host = host.lowercased()
+        }
+        components.fragment = nil
+        return components.url
     }
 }

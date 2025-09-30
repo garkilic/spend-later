@@ -11,12 +11,14 @@ final class PersistenceController {
     let container: NSPersistentContainer
 
     init(inMemory: Bool = false) {
-        let model = PersistenceController.makeModel()
+        let model = PersistenceController.makeModel(for: ModelVersion.current)
         container = NSPersistentContainer(name: "SpendLaterModel", managedObjectModel: model)
 
         if inMemory {
             let description = NSPersistentStoreDescription()
             description.type = NSInMemoryStoreType
+            description.shouldMigrateStoreAutomatically = true
+            description.shouldInferMappingModelAutomatically = true
             container.persistentStoreDescriptions = [description]
         } else {
             let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -24,6 +26,8 @@ final class PersistenceController {
             let description = NSPersistentStoreDescription(url: storeURL)
             description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+            description.shouldMigrateStoreAutomatically = true
+            description.shouldInferMappingModelAutomatically = true
             container.persistentStoreDescriptions = [description]
         }
 
@@ -38,9 +42,17 @@ final class PersistenceController {
     }
 }
 
+private enum ModelVersion: String {
+    case v1 = "SpendLaterModelV1"
+    case v2 = "SpendLaterModelV2"
+
+    static var current: ModelVersion { .v2 }
+}
+
 private extension PersistenceController {
-    static func makeModel() -> NSManagedObjectModel {
+    static func makeModel(for version: ModelVersion) -> NSManagedObjectModel {
         let model = NSManagedObjectModel()
+        model.versionIdentifiers = [version.rawValue]
 
         let wantedItem = NSEntityDescription()
         wantedItem.name = "WantedItem"
@@ -54,7 +66,7 @@ private extension PersistenceController {
         appSettings.name = "AppSettings"
         appSettings.managedObjectClassName = NSStringFromClass(AppSettingsEntity.self)
 
-        let wantedItemProps = makeWantedItemAttributes()
+        let wantedItemProps = makeWantedItemAttributes(for: version)
         let monthSummaryProps = makeMonthSummaryAttributes()
         let relationshipPair = makeRelationships(wantedItem: wantedItem, monthSummary: monthSummary)
 
@@ -66,7 +78,7 @@ private extension PersistenceController {
         return model
     }
 
-    static func makeWantedItemAttributes() -> [NSPropertyDescription] {
+    static func makeWantedItemAttributes(for version: ModelVersion) -> [NSPropertyDescription] {
         var properties: [NSPropertyDescription] = []
 
         let id = NSAttributeDescription()
@@ -98,6 +110,14 @@ private extension PersistenceController {
         productText.attributeType = .stringAttributeType
         productText.isOptional = true
         properties.append(productText)
+
+        if version == .v2 {
+            let productURL = NSAttributeDescription()
+            productURL.name = "productURL"
+            productURL.attributeType = .stringAttributeType
+            productURL.isOptional = true
+            properties.append(productURL)
+        }
 
         let imagePath = NSAttributeDescription()
         imagePath.name = "imagePath"

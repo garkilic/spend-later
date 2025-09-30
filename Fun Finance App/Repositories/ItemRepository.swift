@@ -3,7 +3,7 @@ import UIKit
 
 protocol ItemRepositoryProtocol {
     var currentMonthKey: String { get }
-    func addItem(title: String, price: Decimal, notes: String?, productText: String?, image: UIImage?) throws
+    func addItem(title: String, price: Decimal, notes: String?, productText: String?, productURL: String?, image: UIImage?) throws
     func items(for monthKey: String) throws -> [WantedItemEntity]
     func activeItems(for monthKey: String) throws -> [WantedItemEntity]
     func allItems() throws -> [WantedItemEntity]
@@ -20,6 +20,7 @@ struct ItemSnapshot {
     let price: Decimal
     let notes: String?
     let productText: String?
+    let productURL: String?
     let imagePath: String
     let createdAt: Date
     let monthKey: String
@@ -44,7 +45,7 @@ final class ItemRepository: ItemRepositoryProtocol {
         monthKey(for: Date())
     }
 
-    func addItem(title: String, price: Decimal, notes: String?, productText: String?, image: UIImage?) throws {
+    func addItem(title: String, price: Decimal, notes: String?, productText: String?, productURL: String?, image: UIImage?) throws {
         let filename: String
         if let image {
             filename = try imageStore.save(image: image)
@@ -57,6 +58,7 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.price = NSDecimalNumber(decimal: price)
         item.notes = notes
         item.productText = productText
+        item.productURL = productURL
         item.imagePath = filename
         item.createdAt = Date()
         item.monthKey = monthKey(for: item.createdAt)
@@ -96,6 +98,7 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.price = NSDecimalNumber(decimal: snapshot.price)
         item.notes = snapshot.notes
         item.productText = snapshot.productText
+        item.productURL = snapshot.productURL
         item.imagePath = snapshot.imagePath
         item.createdAt = snapshot.createdAt
         item.monthKey = snapshot.monthKey
@@ -109,6 +112,7 @@ final class ItemRepository: ItemRepositoryProtocol {
                      price: item.price.decimalValue,
                      notes: item.notes,
                      productText: item.productText,
+                     productURL: item.productURL,
                      imagePath: item.imagePath,
                      createdAt: item.createdAt,
                      monthKey: item.monthKey,

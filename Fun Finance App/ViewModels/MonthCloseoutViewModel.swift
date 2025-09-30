@@ -36,6 +36,7 @@ final class MonthCloseoutViewModel: ObservableObject {
                               price: entity.price.decimalValue,
                               notes: entity.notes,
                               productText: entity.productText,
+                              productURL: entity.productURL,
                               imagePath: entity.imagePath,
                               status: entity.status,
                               createdAt: entity.createdAt)
@@ -47,6 +48,7 @@ final class MonthCloseoutViewModel: ObservableObject {
                                        price: winnerEntity.price.decimalValue,
                                        notes: winnerEntity.notes,
                                        productText: winnerEntity.productText,
+                                       productURL: winnerEntity.productURL,
                                        imagePath: winnerEntity.imagePath,
                                        status: winnerEntity.status,
                                        createdAt: winnerEntity.createdAt)

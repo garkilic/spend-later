@@ -18,12 +18,13 @@ final class AppContainer: ObservableObject {
 
     var viewContext: NSManagedObjectContext { persistenceController.container.viewContext }
 
-    init(persistenceController: PersistenceController = .shared) {
-        self.persistenceController = persistenceController
+    init(persistenceController: PersistenceController? = nil) {
+        let controller = persistenceController ?? PersistenceController.shared
+        self.persistenceController = controller
         self.imageStore = ImageStore()
-        self.itemRepository = ItemRepository(context: persistenceController.container.viewContext, imageStore: imageStore)
-        self.settingsRepository = SettingsRepository(context: persistenceController.container.viewContext)
-        self.monthRepository = MonthRepository(context: persistenceController.container.viewContext, itemRepository: itemRepository)
+        self.itemRepository = ItemRepository(context: controller.container.viewContext, imageStore: imageStore)
+        self.settingsRepository = SettingsRepository(context: controller.container.viewContext)
+        self.monthRepository = MonthRepository(context: controller.container.viewContext, itemRepository: itemRepository)
         self.notificationScheduler = NotificationScheduler()
         self.passcodeManager = PasscodeManager()
         self.hapticManager = HapticManager.shared

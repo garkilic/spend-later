@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		F4753E062E8C375300A9F2EA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F4753D192E8C375200A9F2EA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F4753D202E8C375200A9F2EA;
+			remoteInfo = "Fun Finance App";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		F4753D212E8C375200A9F2EA /* Fun Finance App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Fun Finance App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4753E032E8C375300A9F2EA /* Fun Finance AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Fun Finance AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = "Fun Finance App";
 			sourceTree = "<group>";
 		};
+		F4753E042E8C375300A9F2EA /* Fun Finance AppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Fun Finance AppTests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		F4753D1E2E8C375200A9F2EA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4753E022E8C375300A9F2EA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				F4753D232E8C375200A9F2EA /* Fun Finance App */,
+				F4753E042E8C375300A9F2EA /* Fun Finance AppTests */,
 				F4753D222E8C375200A9F2EA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				F4753D212E8C375200A9F2EA /* Fun Finance App.app */,
+				F4753E032E8C375300A9F2EA /* Fun Finance AppTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,28 @@
 			productReference = F4753D212E8C375200A9F2EA /* Fun Finance App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F4753E002E8C375300A9F2EA /* Fun Finance AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4753E072E8C375300A9F2EA /* Build configuration list for PBXNativeTarget "Fun Finance AppTests" */;
+			buildPhases = (
+				F4753E012E8C375300A9F2EA /* Sources */,
+				F4753E022E8C375300A9F2EA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F4753E052E8C375300A9F2EA /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F4753E042E8C375300A9F2EA /* Fun Finance AppTests */,
+			);
+			name = "Fun Finance AppTests";
+			packageProductDependencies = (
+			);
+			productName = "Fun Finance AppTests";
+			productReference = F4753E032E8C375300A9F2EA /* Fun Finance AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -81,6 +128,9 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					F4753D202E8C375200A9F2EA = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					F4753E002E8C375300A9F2EA = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
@@ -100,6 +150,7 @@
 			projectRoot = "";
 			targets = (
 				F4753D202E8C375200A9F2EA /* Fun Finance App */,
+				F4753E002E8C375300A9F2EA /* Fun Finance AppTests */,
 			);
 		};
 /* End PBXProject section */
@@ -122,7 +173,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F4753E012E8C375300A9F2EA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F4753E052E8C375300A9F2EA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F4753D202E8C375200A9F2EA /* Fun Finance App */;
+			targetProxy = F4753E062E8C375300A9F2EA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F4753D2A2E8C375300A9F2EA /* Debug */ = {
@@ -251,7 +317,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R44595ABL6;
@@ -288,7 +354,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R44595ABL6;
@@ -317,6 +383,60 @@
 			};
 			name = Release;
 		};
+		F4753E082E8C375300A9F2EA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R44595ABL6;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "punkproduct.Fun-Finance-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fun Finance App.app/Fun Finance App";
+			};
+			name = Debug;
+		};
+		F4753E092E8C375300A9F2EA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R44595ABL6;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "punkproduct.Fun-Finance-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fun Finance App.app/Fun Finance App";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -334,6 +454,15 @@
 			buildConfigurations = (
 				F4753D2D2E8C375300A9F2EA /* Debug */,
 				F4753D2E2E8C375300A9F2EA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4753E072E8C375300A9F2EA /* Build configuration list for PBXNativeTarget "Fun Finance AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4753E082E8C375300A9F2EA /* Debug */,
+				F4753E092E8C375300A9F2EA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

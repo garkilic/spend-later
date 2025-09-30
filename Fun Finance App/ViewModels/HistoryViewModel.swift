@@ -60,6 +60,7 @@ final class HistoryViewModel: ObservableObject {
                                   price: entity.price.decimalValue,
                                   notes: entity.notes,
                                   productText: entity.productText,
+                                  productURL: entity.productURL,
                                   imagePath: entity.imagePath,
                                   status: entity.status,
                                   createdAt: entity.createdAt)
@@ -96,6 +97,7 @@ private extension HistoryViewModel {
                                       price: entity.price.decimalValue,
                                       notes: entity.notes,
                                       productText: entity.productText,
+                                      productURL: entity.productURL,
                                       imagePath: entity.imagePath,
                                       status: entity.status,
                                       createdAt: entity.createdAt)

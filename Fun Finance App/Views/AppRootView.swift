@@ -42,12 +42,20 @@ struct AppRootView: View {
                 .tag(Tab.dashboard)
 
             Color.clear
-                .tabItem { Label("Add", systemImage: "plus.circle.fill") }
+                .tabItem {
+                    Label {
+                        Text("Add")
+                    } icon: {
+                        Image(systemName: "plus.circle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, addTabAccent)
+                    }
+                }
                 .tag(Tab.add)
 
             HistoryView(viewModel: historyViewModel)
-            .tabItem { Label("History", systemImage: "clock") }
-            .tag(Tab.history)
+                .tabItem { Label("History", systemImage: "clock") }
+                .tag(Tab.history)
 
         }
         .sheet(item: $closeoutSummary) { summary in
@@ -95,6 +103,10 @@ struct AppRootView: View {
 }
 
 private extension AppRootView {
+    var addTabAccent: Color {
+        Color(red: 0.02, green: 0.65, blue: 0.41)
+    }
+
     func checkRollover() async {
         do {
             if let summary = try container.rolloverService.evaluateIfNeeded() {

@@ -136,18 +136,20 @@ private extension DashboardView {
                 .foregroundStyle(.white)
                 .minimumScaleFactor(0.5)
 
-            Button {
-                onShowCloseout()
-            } label: {
-                Label("Review last month", systemImage: "sparkles")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.white.opacity(0.18))
-                    .clipShape(Capsule())
+            if viewModel.canReviewLastMonth {
+                Button {
+                    onShowCloseout()
+                } label: {
+                    Label("Review last month", systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.18))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)

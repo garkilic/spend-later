@@ -8,6 +8,7 @@ final class WantedItemEntity: NSManagedObject {
     @NSManaged var price: NSDecimalNumber
     @NSManaged var notes: String?
     @NSManaged var productText: String?
+    @NSManaged var productURL: String?
     @NSManaged var imagePath: String
     @NSManaged var createdAt: Date
     @NSManaged var monthKey: String

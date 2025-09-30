@@ -40,7 +40,7 @@ struct ItemCardView: View {
 
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
-    let item = WantedItemDisplay(id: UUID(), title: "Fancy Jacket", price: 149.99, notes: "On sale", productText: "Brand X", imagePath: "", status: .active, createdAt: Date())
+    let item = WantedItemDisplay(id: UUID(), title: "Fancy Jacket", price: 149.99, notes: "On sale", productText: "Brand X", productURL: nil, imagePath: "", status: .active, createdAt: Date())
     return ItemCardView(item: item, image: nil)
         .padding()
 }
