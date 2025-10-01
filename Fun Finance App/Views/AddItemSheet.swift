@@ -23,9 +23,16 @@ struct AddItemSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                photoSection
+                // Show preview prominently if we have one from URL
+                if viewModel.previewImage != nil {
+                    previewSection
+                }
                 linkSection
                 detailsSection
+                // Only show photo section if no preview image from URL
+                if viewModel.previewImage == nil {
+                    photoSection
+                }
                 if let error = viewModel.errorMessage {
                     Section {
                         Text(error)
@@ -33,7 +40,7 @@ struct AddItemSheet: View {
                     }
                 }
             }
-            .navigationTitle("Add Item")
+            .navigationTitle("Log a Win")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -41,6 +48,13 @@ struct AddItemSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
                         .disabled(!viewModel.isValid)
+                }
+                ToolbarItem(placement: .keyboard) {
+                    Button("Done") {
+                        focusedField = nil
+                    }
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
             .sheet(isPresented: $showingPhotoPicker) {
@@ -72,20 +86,24 @@ struct AddItemSheet: View {
 }
 
 private extension AddItemSheet {
-    var linkSection: some View {
-        Section("Product URL") {
+    var previewSection: some View {
+        Section("Product Image") {
             if let preview = viewModel.previewImage {
                 Image(uiImage: preview)
                     .resizable()
                     .scaledToFill()
-                    .frame(height: 180)
+                    .frame(height: 220)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .clipped()
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
                     .listRowBackground(Color.clear)
             }
+        }
+    }
 
+    var linkSection: some View {
+        Section("Product URL") {
             TextField("https://example.com/product", text: $viewModel.urlText)
                 .keyboardType(.URL)
                 .autocorrectionDisabled()
@@ -110,7 +128,7 @@ private extension AddItemSheet {
         Section("Photo") {
         VStack(alignment: .center, spacing: 12) {
             photoPreview
-            Text("Optional: attach a quick photo of the temptation.")
+            Text("Optional: attach a quick photo of what you resisted.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

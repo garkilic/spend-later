@@ -3,6 +3,7 @@ import UIKit
 
 protocol ItemRepositoryProtocol {
     var currentMonthKey: String { get }
+    var context: NSManagedObjectContext { get }
     func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) throws
     func items(for monthKey: String) throws -> [WantedItemEntity]
     func activeItems(for monthKey: String) throws -> [WantedItemEntity]
@@ -29,7 +30,7 @@ struct ItemSnapshot {
 }
 
 final class ItemRepository: ItemRepositoryProtocol {
-    private let context: NSManagedObjectContext
+    let context: NSManagedObjectContext
     private let imageStore: ImageStoring
     private let calendar: Calendar
     private let monthFormatter: DateFormatter
@@ -146,8 +147,15 @@ final class ItemRepository: ItemRepositoryProtocol {
 
 private extension ItemRepository {
     func saveIfNeeded() throws {
-        if context.hasChanges {
+        guard context.hasChanges else { return }
+
+        // Ensure we're on the correct thread for this context
+        if Thread.isMainThread {
             try context.save()
+        } else {
+            try context.performAndWait {
+                try context.save()
+            }
         }
     }
 }

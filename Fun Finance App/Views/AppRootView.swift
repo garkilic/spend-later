@@ -5,6 +5,7 @@ struct AppRootView: View {
         case dashboard
         case add
         case history
+        case reward
     }
 
     let container: AppContainer
@@ -13,6 +14,7 @@ struct AppRootView: View {
     @StateObject private var dashboardViewModel: DashboardViewModel
     @StateObject private var addItemViewModel: AddItemViewModel
     @StateObject private var historyViewModel: HistoryViewModel
+    @StateObject private var rewardViewModel: TestViewModel
     @StateObject private var settingsViewModel: SettingsViewModel
     @StateObject private var passcodeViewModel: PasscodeViewModel
 
@@ -22,6 +24,8 @@ struct AppRootView: View {
     @State private var isLocked = false
     @State private var showingAddSheet = false
     @State private var showingSettings = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showingOnboarding = false
 
     init(container: AppContainer) {
         self.container = container
@@ -34,6 +38,11 @@ struct AppRootView: View {
                                                                       itemRepository: container.itemRepository,
                                                                       imageStore: container.imageStore,
                                                                       settingsRepository: container.settingsRepository))
+        _rewardViewModel = StateObject(wrappedValue: TestViewModel(itemRepository: container.itemRepository,
+                                                                   monthRepository: container.monthRepository,
+                                                                   settingsRepository: container.settingsRepository,
+                                                                   imageStore: container.imageStore,
+                                                                   haptics: container.hapticManager))
         _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(settingsRepository: container.settingsRepository, notificationScheduler: container.notificationScheduler, passcodeManager: container.passcodeManager))
         _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(passcodeManager: container.passcodeManager, settingsRepository: container.settingsRepository))
     }
@@ -43,16 +52,10 @@ struct AppRootView: View {
             DashboardView(viewModel: dashboardViewModel,
                           addItemViewModel: addItemViewModel,
                           onOpenSettings: { showingSettings = true },
-                          onShowCloseout: { Task { await checkRollover() } },
                           makeDetailViewModel: { item in
                               ItemDetailViewModel(item: item,
                                                   itemRepository: container.itemRepository,
                                                   settingsRepository: container.settingsRepository)
-                          },
-                          makeReviewViewModel: {
-                              ReviewItemsViewModel(itemRepository: container.itemRepository,
-                                                   imageStore: container.imageStore,
-                                                   settingsRepository: container.settingsRepository)
                           })
                 .tabItem { Label("Dashboard", systemImage: "house") }
                 .tag(Tab.dashboard)
@@ -72,6 +75,12 @@ struct AppRootView: View {
                         })
                 .tabItem { Label("History", systemImage: "clock") }
                 .tag(Tab.history)
+
+            TestView(viewModel: rewardViewModel) { item in
+                container.imageStore.loadImage(named: item.imagePath)
+            }
+                .tabItem { Label("Reward", systemImage: "gift.fill") }
+                .tag(Tab.reward)
 
         }
         .onChange(of: selectedTab) { oldValue, newValue in
@@ -99,6 +108,11 @@ struct AppRootView: View {
         .sheet(isPresented: $showingAddSheet) {
             AddItemSheet(viewModel: addItemViewModel)
         }
+        .sheet(isPresented: $showingOnboarding) {
+            OnboardingView {
+                hasCompletedOnboarding = true
+            }
+        }
         .fullScreenCover(isPresented: $isLocked) {
             PasscodeLockView(viewModel: passcodeViewModel) {
                 isLocked = false
@@ -107,7 +121,11 @@ struct AppRootView: View {
         .onAppear {
             dashboardViewModel.refresh()
             historyViewModel.refresh()
+            rewardViewModel.refresh()
             settingsViewModel.load()
+            if !hasCompletedOnboarding {
+                showingOnboarding = true
+            }
             Task { await checkRollover() }
             Task { await refreshLockState() }
         }

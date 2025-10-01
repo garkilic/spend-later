@@ -5,47 +5,46 @@ struct DashboardView: View {
     @StateObject private var addItemViewModel: AddItemViewModel
     @State private var showingAddSheet = false
     @State private var selectedItem: WantedItemDisplay?
-    @State private var showingSummary = false
-    @State private var showingReview = false
     let onOpenSettings: () -> Void
-    let onShowCloseout: () -> Void
     let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
-    let makeReviewViewModel: () -> ReviewItemsViewModel
 
     init(viewModel: DashboardViewModel,
          addItemViewModel: AddItemViewModel,
          onOpenSettings: @escaping () -> Void,
-         onShowCloseout: @escaping () -> Void,
-         makeDetailViewModel: @escaping (WantedItemDisplay) -> ItemDetailViewModel,
-         makeReviewViewModel: @escaping () -> ReviewItemsViewModel) {
+         makeDetailViewModel: @escaping (WantedItemDisplay) -> ItemDetailViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
         _addItemViewModel = StateObject(wrappedValue: addItemViewModel)
         self.onOpenSettings = onOpenSettings
-        self.onShowCloseout = onShowCloseout
         self.makeDetailViewModel = makeDetailViewModel
-        self.makeReviewViewModel = makeReviewViewModel
     }
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 backgroundGradient.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        header
-                        itemsGrid
+                    VStack(alignment: .leading, spacing: Spacing.cardSpacing) {
+                        savingsHero
+                        statsRow
+                        recentActivitySection
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 28)
+                    .padding(.horizontal, Spacing.sideGutter)
+                    .padding(.top, Spacing.safeAreaTop)
+                    .padding(.bottom, 80) // Space for sticky button
                 }
+
+                // Sticky Add Button
+                addButton
             }
-            .navigationTitle("This Month")
+            .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.large)
+            .errorBanner($viewModel.errorMessage)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(action: onOpenSettings) {
-                        Image(systemName: "gearshape.fill")
+                        Image(systemName: "gearshape")
+                            .imageScale(.large)
                     }
                     .accessibilityLabel("Settings")
                 }
@@ -57,15 +56,10 @@ struct DashboardView: View {
             .sheet(item: $selectedItem) { item in
                 detailSheet(for: item)
             }
-            .sheet(isPresented: $showingSummary) {
-                YearlySummaryView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingReview) {
-                ReviewItemsView(viewModel: makeReviewViewModel())
-            }
-            .onChange(of: showingAddSheet) { isPresented in
+            .onChange(of: showingAddSheet) { _, isPresented in
                 if !isPresented {
                     viewModel.refresh()
+                    HapticManager.shared.success()
                 }
             }
             .onAppear { viewModel.refresh() }
@@ -74,50 +68,246 @@ struct DashboardView: View {
 }
 
 private extension DashboardView {
-    var header: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            totalCard
-            statsRow
+    var backgroundGradient: some View {
+        LinearGradient(
+            colors: [
+                Color.surfaceFallback,
+                Color.surfaceElevatedFallback
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .opacity(0.06)
+        .background(Color.surfaceFallback)
+    }
+
+    var savingsHero: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            // Title with icon
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.successFallback, Color.successFallback.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Text("Willpower wins")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white.opacity(0.9))
+            }
+
+            // Large amount
+            Text(CurrencyFormatter.string(from: viewModel.totalSaved))
+                .font(.system(size: 52, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+                .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+
+            // Subtitle
+            Text("Saved this month by saying no to impulse buys")
+                .font(.footnote)
+                .foregroundColor(.white.opacity(0.85))
+                .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.xl)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.successFallback,
+                    Color.successFallback.opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(CornerRadius.card)
+        .shadow(
+            color: Color.successFallback.opacity(0.3),
+            radius: 16,
+            y: 8
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Willpower wins: \(CurrencyFormatter.string(from: viewModel.totalSaved)) saved this month")
+    }
+
+    var statsRow: some View {
+        HStack(spacing: Spacing.cardSpacing) {
+            statCard(
+                icon: "flame.fill",
+                title: "Impulses resisted",
+                value: "\(viewModel.itemCount)",
+                subtitle: "this month",
+                color: Color(red: 1.0, green: 0.3, blue: 0.3)
+            )
+
+            statCard(
+                icon: "dollarsign.circle.fill",
+                title: "Average avoided spend",
+                value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
+                subtitle: "per purchase",
+                color: Color.successFallback
+            )
         }
     }
 
-    var itemsGrid: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Temptations")
-                .font(.headline)
-                .foregroundStyle(Color.primary.opacity(0.85))
+    func statCard(icon: String, title: String, value: String, subtitle: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(color)
+                Spacer()
+            }
+
+            Spacer()
+
+            Text(value)
+                .font(.system(.title2, design: .rounded))
+                .fontWeight(.bold)
+                .monospacedDigit()
+                .foregroundColor(Color.primaryFallback)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundColor(Color.secondaryFallback)
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 120)
+        .cardStyle()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value), \(subtitle)")
+    }
+
+    var recentActivitySection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("RECENT ACTIVITY")
+                .sectionHeaderStyle()
+
             if viewModel.items.isEmpty {
-                VStack(spacing: 16) {
-                    EmptyStateView(title: "Nothing logged yet", message: "Log something you skipped and note how much you saved. A photo is optional but keeps the memory.")
-                        .frame(maxWidth: .infinity)
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Label("Start Tracking", systemImage: "plus.circle.fill")
-                            .font(.headline)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
+                emptyState
             } else {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(viewModel.items) { item in
-                        ItemCardView(item: item, image: viewModel.image(for: item))
-                            .frame(maxWidth: .infinity)
-                            .contentShape(Rectangle())
-                            .onTapGesture { selectedItem = item }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    viewModel.delete(item)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                    }
-                }
+                itemsList
             }
         }
+    }
+
+    var emptyState: some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 48))
+                .foregroundColor(Color.secondaryFallback.opacity(0.5))
+
+            Text("No wins yet")
+                .font(.headline)
+                .foregroundColor(Color.primaryFallback)
+
+            Text("Log your first resisted purchase below")
+                .font(.subheadline)
+                .foregroundColor(Color.secondaryFallback)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xxl)
+        .padding(.horizontal, Spacing.xl)
+        .cardStyle()
+    }
+
+    var itemsList: some View {
+        VStack(spacing: Spacing.xs) {
+            ForEach(viewModel.items) { item in
+                itemRow(item)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedItem = item
+                        HapticManager.shared.lightImpact()
+                    }
+            }
+        }
+    }
+
+    func itemRow(_ item: WantedItemDisplay) -> some View {
+        HStack(spacing: Spacing.sm) {
+            // Icon
+            Image(systemName: "wallet.pass.fill")
+                .font(.title3)
+                .foregroundColor(Color.accentFallback)
+                .frame(width: 32, height: 32)
+                .background(Color.accentFallback.opacity(0.1))
+                .clipShape(Circle())
+
+            // Content
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(Color.primaryFallback)
+                    .lineLimit(1)
+
+                Text(item.createdAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption)
+                    .foregroundColor(Color.secondaryFallback)
+            }
+
+            Spacer()
+
+            // Amount
+            Text(CurrencyFormatter.string(from: item.priceWithTax))
+                .font(.body)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+                .foregroundColor(Color.successFallback)
+        }
+        .padding(Spacing.md)
+        .background(Color.surfaceElevatedFallback)
+        .cornerRadius(CornerRadius.listRow)
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                viewModel.delete(item)
+                HapticManager.shared.mediumImpact()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.title), saved \(CurrencyFormatter.string(from: item.priceWithTax)), \(item.createdAt.formatted(date: .abbreviated, time: .omitted))")
+    }
+
+    var addButton: some View {
+        Button {
+            showingAddSheet = true
+            HapticManager.shared.lightImpact()
+        } label: {
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                Text("Log a Win")
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Color.accentFallback)
+            .foregroundColor(.white)
+            .cornerRadius(CornerRadius.button)
+            .shadow(
+                color: Color.black.opacity(0.15),
+                radius: 12,
+                y: 4
+            )
+        }
+        .padding(.horizontal, Spacing.sideGutter)
+        .padding(.bottom, Spacing.md)
+        .accessibilityLabel("Log a win")
+        .accessibilityHint("Opens form to log a resisted purchase")
     }
 
     var undoBanner: some View {
@@ -125,113 +315,25 @@ private extension DashboardView {
             if let pending = viewModel.pendingUndoItem {
                 HStack {
                     Text("Deleted \(pending.title)")
+                        .font(.subheadline)
                     Spacer()
-                    Button("Undo") { viewModel.undoDelete() }
-                }
-                .padding()
-                .background(.thinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding()
-                .transition(.move(edge: .bottom))
-            }
-        }
-    }
-
-    var backgroundGradient: LinearGradient {
-        LinearGradient(colors: [Color(.systemGroupedBackground), Color(red: 0.9, green: 0.98, blue: 0.93)], startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
-    var totalCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Money banked this month")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.85))
-
-            Text(CurrencyFormatter.string(from: viewModel.totalSaved))
-                .font(.system(size: 46, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.5)
-
-            HStack(spacing: 12) {
-                if viewModel.canReviewLastMonth {
-                    Button {
-                        onShowCloseout()
-                    } label: {
-                        Label("Review last month", systemImage: "sparkles")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(0.18))
-                            .clipShape(Capsule())
+                    Button("Undo") {
+                        viewModel.undoDelete()
+                        HapticManager.shared.lightImpact()
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
+                    .fontWeight(.semibold)
                 }
-
-                Spacer()
-
-                Label("Past year", systemImage: "chart.line.uptrend.xyaxis")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.85))
+                .padding()
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.listRow))
+                .padding(.horizontal, Spacing.sideGutter)
+                .padding(.bottom, 80) // Above sticky button
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(colors: [Color(red: 0.02, green: 0.65, blue: 0.41), Color(red: 0.0, green: 0.5, blue: 0.33)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-        )
-        .shadow(color: Color(red: 0.0, green: 0.5, blue: 0.33).opacity(0.35), radius: 14, x: 0, y: 10)
-        .contentShape(Rectangle())
-        .onTapGesture { showingSummary = true }
+        .animation(.spring, value: viewModel.pendingUndoItem != nil)
     }
 
-    var statsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                statPill(title: "Items logged", value: "\(viewModel.itemCount)", icon: "square.stack.3d.up")
-                Button {
-                    showingReview = true
-                } label: {
-                    statPill(title: "Needs review", value: "\(viewModel.reviewCount)", icon: "hand.raised")
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 4)
-        }
-    }
-
-    func statPill(title: String, value: String, icon: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 0.0, green: 0.6, blue: 0.35))
-                .padding(10)
-                .background(Color(red: 0.0, green: 0.6, blue: 0.35).opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.headline)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(Color(.systemBackground).opacity(0.92))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 4)
-    }
-}
-
-private extension DashboardView {
     func detailSheet(for item: WantedItemDisplay) -> some View {
         let detailViewModel = makeDetailViewModel(item)
         return ItemDetailView(viewModel: detailViewModel,
@@ -255,16 +357,10 @@ private extension DashboardView {
     return DashboardView(viewModel: dashboardVM,
                          addItemViewModel: AddItemViewModel(itemRepository: container.itemRepository),
                          onOpenSettings: {},
-                         onShowCloseout: {},
                          makeDetailViewModel: { item in
                              ItemDetailViewModel(item: item,
                                                  itemRepository: container.itemRepository,
                                                  settingsRepository: container.settingsRepository)
-                         },
-                         makeReviewViewModel: {
-                             ReviewItemsViewModel(itemRepository: container.itemRepository,
-                                                  imageStore: container.imageStore,
-                                                  settingsRepository: container.settingsRepository)
                          })
 }
 #endif

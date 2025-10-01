@@ -7,6 +7,7 @@ import UIKit
 final class HistoryViewModel: ObservableObject {
     @Published var summaries: [MonthSummaryDisplay] = []
     @Published var sections: [HistorySection] = []
+    @Published var winnerItemIds: Set<UUID> = []
 
     private let monthRepository: MonthRepositoryProtocol
     private let itemRepository: ItemRepositoryProtocol
@@ -39,6 +40,9 @@ final class HistoryViewModel: ObservableObject {
                                     winnerItemId: entity.winnerItemId,
                                     closedAt: entity.closedAt)
             }
+
+            // Collect all winner IDs
+            winnerItemIds = Set(summaryEntities.compactMap { $0.winnerItemId })
 
             let allItems = try itemRepository.allItems()
             sections = makeSections(from: allItems)

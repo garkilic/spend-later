@@ -105,11 +105,19 @@ private extension AddItemViewModel {
             let metadata = try await linkPreviewService.fetchMetadata(for: urlString)
             guard !Task.isCancelled else { return }
             resolvedProductURL = metadata.normalizedURL
+
+            // Auto-fill title if empty
             if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let fetchedTitle = metadata.title,
                !fetchedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 title = fetchedTitle
             }
+
+            // Auto-fill price if found and current price is zero
+            if price == .zero, let fetchedPrice = metadata.price, fetchedPrice > 0 {
+                price = fetchedPrice
+            }
+
             previewImage = metadata.image ?? metadata.icon
         } catch {
             guard !Task.isCancelled else { return }

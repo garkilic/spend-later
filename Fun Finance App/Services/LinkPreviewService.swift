@@ -7,6 +7,7 @@ struct LinkPreviewMetadata {
     let image: UIImage?
     let icon: UIImage?
     let normalizedURL: URL
+    let price: Decimal?
 }
 
 protocol LinkPreviewServicing {
@@ -28,12 +29,13 @@ final class LinkPreviewService: LinkPreviewServicing {
         let normalizedURL = try normalize(urlString: urlString)
         do {
             var providerResult = try await fetchUsingMetadataProvider(for: normalizedURL)
-            if providerResult.image == nil || providerResult.icon == nil || providerResult.title == nil {
+            if providerResult.image == nil || providerResult.icon == nil || providerResult.title == nil || providerResult.price == nil {
                 if let enriched = try? await fetchFromHTML(for: providerResult.normalizedURL) {
                     providerResult = LinkPreviewMetadata(title: providerResult.title ?? enriched.title,
                                                          image: providerResult.image ?? enriched.image,
                                                          icon: providerResult.icon ?? enriched.icon,
-                                                         normalizedURL: enriched.normalizedURL)
+                                                         normalizedURL: enriched.normalizedURL,
+                                                         price: providerResult.price ?? enriched.price)
                 }
             }
             return providerResult
@@ -83,11 +85,11 @@ private extension LinkPreviewService {
         }
 
         let resolvedURL = metadata.url ?? metadata.originalURL ?? url
-        let title = metadata.title?.trimmingCharacters(in: Foundation.CharacterSet.whitespacesAndNewlines)
+        let title = metadata.title?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let image = await loadImage(from: metadata.imageProvider)
         let icon = await loadImage(from: metadata.iconProvider)
 
-        return LinkPreviewMetadata(title: title, image: image, icon: icon, normalizedURL: resolvedURL)
+        return LinkPreviewMetadata(title: title, image: image, icon: icon, normalizedURL: resolvedURL, price: nil)
     }
 
     func loadImage(from provider: NSItemProvider?) async -> UIImage? {
@@ -102,17 +104,68 @@ private extension LinkPreviewService {
     func fetchFromHTML(for url: URL) async throws -> LinkPreviewMetadata {
         let (data, _) = try await urlSession.data(from: url)
         guard let html = String(data: data, encoding: .utf8) else {
-            return LinkPreviewMetadata(title: nil, image: nil, icon: nil, normalizedURL: url)
+            return LinkPreviewMetadata(title: nil, image: nil, icon: nil, normalizedURL: url, price: nil)
         }
 
         let title = parseTitle(in: html)
         let imageURL = parseMetaContent(in: html, keys: ["og:image", "twitter:image", "og:image:url"])?.resolved(relativeTo: url)
         let iconURL = parseIconURL(in: html, baseURL: url)
+        let price = parsePrice(in: html)
 
         async let image = loadRemoteImage(from: imageURL)
         async let icon = loadRemoteImage(from: iconURL)
 
-        return LinkPreviewMetadata(title: title, image: await image, icon: await icon, normalizedURL: url)
+        return LinkPreviewMetadata(title: title, image: await image, icon: await icon, normalizedURL: url, price: price)
+    }
+
+    func parsePrice(in html: String) -> Decimal? {
+        // Look for common price meta tags and schema.org markup
+        let priceKeys = [
+            "product:price:amount",
+            "og:price:amount",
+            "twitter:data1",
+            "price"
+        ]
+
+        if let priceString = parseMetaContent(in: html, keys: priceKeys) {
+            return extractDecimal(from: priceString)
+        }
+
+        // Look for JSON-LD schema.org Product markup
+        if let schemaPrice = parseSchemaOrgPrice(in: html) {
+            return schemaPrice
+        }
+
+        return nil
+    }
+
+    func parseSchemaOrgPrice(in html: String) -> Decimal? {
+        // Simple regex to find price in JSON-LD Product schema
+        let pattern = "\"price\"\\s*:\\s*\"?([0-9]+\\.?[0-9]*)\"?"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+
+        let nsRange = NSRange(html.startIndex..., in: html)
+        guard let match = regex.firstMatch(in: html, range: nsRange),
+              let range = Range(match.range(at: 1), in: html) else {
+            return nil
+        }
+
+        let priceString = String(html[range])
+        return extractDecimal(from: priceString)
+    }
+
+    func extractDecimal(from string: String) -> Decimal? {
+        // Remove currency symbols and commas
+        let cleaned = string
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: "£", with: "")
+            .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return Decimal(string: cleaned)
     }
 
     func parseTitle(in html: String) -> String? {

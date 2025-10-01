@@ -27,6 +27,7 @@ final class ImageStore: ImageStoring {
     }
 
     func loadImage(named filename: String) -> UIImage? {
+        guard !filename.isEmpty else { return nil }
         let url = directoryURL.appendingPathComponent(filename)
         guard fileManager.fileExists(atPath: url.path) else { return nil }
         return UIImage(contentsOfFile: url.path)

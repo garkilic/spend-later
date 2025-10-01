@@ -7,10 +7,12 @@ final class DashboardViewModel: ObservableObject {
     @Published var items: [WantedItemDisplay] = []
     @Published var totalSaved: Decimal = .zero
     @Published var itemCount: Int = 0
+    @Published var averageItemPrice: Decimal = .zero
     @Published var pendingUndoItem: WantedItemDisplay?
     @Published var canReviewLastMonth: Bool = false
     @Published var yearlyTotals: [MonthlyTrendPoint] = []
-    @Published var reviewCount: Int = 0
+    @Published var errorMessage: String?
+    @Published var isLoading: Bool = false
 
     private let itemRepository: ItemRepositoryProtocol
     private let monthRepository: MonthRepositoryProtocol
@@ -18,6 +20,7 @@ final class DashboardViewModel: ObservableObject {
     private let imageStore: ImageStoring
     private var pendingDeletion: (snapshot: ItemSnapshot, workItem: DispatchWorkItem)?
     private let calendar: Calendar
+    private let haptics = HapticManager.shared
     private var taxRate: Decimal = .zero
 
     init(itemRepository: ItemRepositoryProtocol,
@@ -33,15 +36,19 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func refresh() {
+        isLoading = true
+        defer { isLoading = false }
+
         do {
+            errorMessage = nil
             try reloadTaxRate()
             let items = try itemRepository.items(for: itemRepository.currentMonthKey)
             let displays = makeDisplays(from: items)
             apply(displays: displays)
             updateReviewAvailability()
             try updateYearlyTotals(currentMonthDisplays: displays)
-            updateReviewCount()
         } catch {
+            errorMessage = "Failed to load items. Please try again."
             assertionFailure("Failed to fetch items: \(error)")
         }
     }
@@ -53,7 +60,10 @@ final class DashboardViewModel: ObservableObject {
             try itemRepository.delete(entity)
             scheduleUndo(for: snapshot)
             refresh()
+            haptics.mediumImpact()
         } catch {
+            errorMessage = "Failed to delete item"
+            haptics.error()
             assertionFailure("Delete failed: \(error)")
         }
     }
@@ -98,6 +108,7 @@ private extension DashboardViewModel {
         self.items = displays
         totalSaved = displays.reduce(.zero) { $0 + $1.priceWithTax }
         itemCount = displays.count
+        averageItemPrice = itemCount > 0 ? totalSaved / Decimal(itemCount) : .zero
     }
 
     func updateReviewAvailability() {
@@ -112,21 +123,6 @@ private extension DashboardViewModel {
             canReviewLastMonth = !previousItems.isEmpty
         } catch {
             canReviewLastMonth = false
-        }
-    }
-
-    func updateReviewCount() {
-        guard let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: Date()) else {
-            reviewCount = 0
-            return
-        }
-
-        let key = itemRepository.monthKey(for: previousMonthDate)
-        do {
-            let previousItems = try itemRepository.items(for: key)
-            reviewCount = previousItems.filter { $0.status == .active }.count
-        } catch {
-            reviewCount = 0
         }
     }
 
@@ -167,7 +163,12 @@ private extension DashboardViewModel {
 
     func updateYearlyTotals(currentMonthDisplays: [WantedItemDisplay]) throws {
         let summaries = try monthRepository.summaries()
-        let summaryMap = Dictionary(uniqueKeysWithValues: summaries.map { ($0.monthKey, $0) })
+        var summaryMap: [String: MonthSummaryEntity] = [:]
+        for summary in summaries {
+            if summaryMap[summary.monthKey] == nil {
+                summaryMap[summary.monthKey] = summary
+            }
+        }
         var points: [MonthlyTrendPoint] = []
         let now = Date()
 

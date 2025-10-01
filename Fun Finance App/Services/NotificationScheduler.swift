@@ -24,7 +24,7 @@ final class NotificationScheduler: NotificationScheduling {
 
     func updateWeeklyReminder(enabled: Bool) {
         queue.async {
-            let identifier = "weekly-temptation-reminder"
+            let identifier = "weekly-willpower-reminder"
             self.center.removePendingNotificationRequests(withIdentifiers: [identifier])
             guard enabled else { return }
 
@@ -33,8 +33,8 @@ final class NotificationScheduler: NotificationScheduling {
             dateComponents.hour = 18
 
             let content = UNMutableNotificationContent()
-            content.title = "Log temptations"
-            content.body = "Snap the things you resisted this week."
+            content.title = "Log your wins"
+            content.body = "Snap the impulse purchases you resisted this week."
             content.sound = .default
 
             let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)

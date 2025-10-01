@@ -61,7 +61,8 @@ private extension HistoryView {
                                 } label: {
                                     HistoryItemRow(item: item,
                                                    image: viewModel.image(for: item),
-                                                   timeString: timeFormatter.string(from: item.createdAt))
+                                                   timeString: timeFormatter.string(from: item.createdAt),
+                                                   isWinner: viewModel.winnerItemIds.contains(item.id))
                                 }
                                 .buttonStyle(.plain)
                                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
@@ -115,6 +116,7 @@ private struct HistoryItemRow: View {
     let item: WantedItemDisplay
     let image: UIImage?
     let timeString: String
+    let isWinner: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -127,16 +129,28 @@ private struct HistoryItemRow: View {
                     Spacer()
                     Text(CurrencyFormatter.string(from: item.priceWithTax))
                         .font(.headline)
-                        .foregroundStyle(Color(red: 0.0, green: 0.5, blue: 0.33))
+                        .foregroundStyle(isWinner ? Color.orange : Color(red: 0.0, green: 0.5, blue: 0.33))
                 }
                 if item.priceWithTax != item.price {
                     Text("Base: \(CurrencyFormatter.string(from: item.price))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Text(timeString)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(timeString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if isWinner {
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                            Text("Winner")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(Color.orange)
+                    }
+                }
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.footnote)
@@ -151,13 +165,15 @@ private struct HistoryItemRow: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(.systemBackground).opacity(0.95))
+                .fill(isWinner ?
+                    LinearGradient(colors: [Color.orange.opacity(0.1), Color.orange.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                    LinearGradient(colors: [Color(.systemBackground).opacity(0.95), Color(.systemBackground).opacity(0.95)], startPoint: .topLeading, endPoint: .bottomTrailing))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                .stroke(isWinner ? Color.orange.opacity(0.3) : Color.black.opacity(0.05), lineWidth: isWinner ? 2 : 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 4)
+        .shadow(color: isWinner ? Color.orange.opacity(0.15) : Color.black.opacity(0.04), radius: isWinner ? 10 : 6, x: 0, y: 4)
     }
 
     @ViewBuilder

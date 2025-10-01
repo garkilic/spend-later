@@ -11,12 +11,12 @@ final class MonthCloseoutViewModel: ObservableObject {
 
     private let summary: MonthSummaryEntity
     private let context: NSManagedObjectContext
-    private let haptics: HapticManager
+    private let haptics: HapticFeedback
     private let settingsRepository: SettingsRepositoryProtocol
     private var taxRate: Decimal = .zero
 
     init(summary: MonthSummaryEntity,
-         haptics: HapticManager,
+         haptics: HapticFeedback,
          settingsRepository: SettingsRepositoryProtocol) {
         self.summary = summary
         self.context = summary.managedObjectContext ?? PersistenceController.shared.container.viewContext
@@ -36,6 +36,8 @@ final class MonthCloseoutViewModel: ObservableObject {
     func reload() {
         taxRate = (try? settingsRepository.loadAppSettings().taxRate.decimalValue) ?? .zero
         let entities = summary.wantedItems
+        print("📊 MonthCloseoutViewModel reload: \(entities.count) items from summary")
+        print("📊 Summary items NSSet count: \(summary.items?.count ?? 0)")
         items = entities.map { entity in
             let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
             let basePrice = entity.price.decimalValue
@@ -87,6 +89,31 @@ final class MonthCloseoutViewModel: ObservableObject {
         do {
             try context.save()
             haptics.success()
+            reload()
+        } catch {
+            assertionFailure("Failed to save draw: \(error)")
+        }
+    }
+
+    func setWinner(_ display: WantedItemDisplay) {
+        guard canDraw else { return }
+        guard let winnerEntity = summary.wantedItems.first(where: { $0.id == display.id }) else { return }
+
+        isDrawing = true
+        defer { isDrawing = false }
+
+        for item in summary.wantedItems {
+            if item.id == winnerEntity.id {
+                item.status = .redeemed
+            } else {
+                item.status = .skipped
+            }
+        }
+        summary.winnerItemId = winnerEntity.id
+        summary.closedAt = Date()
+
+        do {
+            try context.save()
             reload()
         } catch {
             assertionFailure("Failed to save draw: \(error)")

@@ -14,7 +14,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Reminders") {
-                    Toggle("Weekly temptation reminder", isOn: Binding(get: { viewModel.weeklyReminderEnabled }, set: { viewModel.toggleWeeklyReminder($0) }))
+                    Toggle("Weekly willpower reminder", isOn: Binding(get: { viewModel.weeklyReminderEnabled }, set: { viewModel.toggleWeeklyReminder($0) }))
                 }
 
                 Section("Pricing") {
