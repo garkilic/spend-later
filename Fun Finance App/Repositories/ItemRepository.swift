@@ -14,6 +14,8 @@ protocol ItemRepositoryProtocol {
     func monthKey(for date: Date) -> String
     func item(with id: UUID) throws -> WantedItemEntity?
     func updateItem(id: UUID, title: String, notes: String?, tags: [String], productURL: String?) throws
+    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) throws
+    func confirmPurchase(itemId: UUID, purchased: Bool) throws
 }
 
 struct ItemSnapshot {
@@ -141,6 +143,50 @@ final class ItemRepository: ItemRepositoryProtocol {
         entity.tags = tags
         entity.productURL = productURL
         entity.productText = nil
+        try saveIfNeeded()
+    }
+
+    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) throws {
+        guard let entity = try item(with: id) else { return }
+        entity.title = title
+        if let price = price {
+            entity.price = NSDecimalNumber(decimal: price)
+        }
+        entity.notes = notes
+        entity.tags = tags
+        entity.productURL = productURL
+        entity.productText = nil
+
+        // Handle image replacement
+        if replaceImage {
+            // Delete old image if exists
+            if !entity.imagePath.isEmpty {
+                imageStore.deleteImage(named: entity.imagePath)
+            }
+
+            // Save new image if provided
+            if let image = image {
+                let filename = try imageStore.save(image: image)
+                entity.imagePath = filename
+            } else {
+                entity.imagePath = ""
+            }
+        }
+
+        try saveIfNeeded()
+    }
+
+    func confirmPurchase(itemId: UUID, purchased: Bool) throws {
+        guard let entity = try item(with: itemId) else { return }
+        entity.actuallyPurchased = purchased
+
+        // Update status
+        if purchased {
+            entity.status = .purchased
+        } else {
+            entity.status = .notPurchased
+        }
+
         try saveIfNeeded()
     }
 }

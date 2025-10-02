@@ -14,11 +14,16 @@ final class WantedItemEntity: NSManagedObject {
     @NSManaged var createdAt: Date
     @NSManaged var monthKey: String
     @NSManaged var statusRaw: String
+    @NSManaged var actuallyPurchased: Bool
     @NSManaged var summary: MonthSummaryEntity?
 
     var status: ItemStatus {
         get { ItemStatus(rawValue: statusRaw) ?? .active }
         set { statusRaw = newValue.rawValue }
+    }
+
+    var hasPurchaseConfirmation: Bool {
+        return status == .purchased || status == .notPurchased
     }
 }
 

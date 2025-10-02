@@ -5,71 +5,47 @@ struct MonthCloseoutView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: MonthCloseoutViewModel
     let imageProvider: (WantedItemDisplay) -> UIImage?
-    @State private var isDrawing = false
-    @State private var showConfetti = false
-    @State private var revealedItems: Set<UUID> = []
-    @State private var isShimmering = false
-    @State private var showWinnerSpotlight = false
+    let autoStart: Bool
+    @State private var scrollOffset: CGFloat = 0
+    @State private var isSpinning = false
+    @State private var showWinner = false
     @Namespace private var animation
 
-    init(viewModel: MonthCloseoutViewModel, imageProvider: @escaping (WantedItemDisplay) -> UIImage?) {
+    init(viewModel: MonthCloseoutViewModel, autoStart: Bool = false, imageProvider: @escaping (WantedItemDisplay) -> UIImage?) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.autoStart = autoStart
         self.imageProvider = imageProvider
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background dimming when winner is shown
-                if showWinnerSpotlight {
-                    Color.black.opacity(0.7)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                }
+                Color.surfaceFallback
+                    .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        Text(viewModel.title)
-                            .font(.largeTitle)
-                            .bold()
-
-                        if showWinnerSpotlight, let winner = viewModel.winner {
-                            // Winner spotlight takes center stage
-                            EmptyView()
-                        } else if !isDrawing && viewModel.winner != nil {
-                            // Post-celebration state
-                            if let winner = viewModel.winner {
-                                winnerSection(for: winner)
-                            }
-                        } else {
-                            // Drawing or initial state
-                            revealGridSection
-                        }
-
-                        if !showWinnerSpotlight {
-                            allItemsSection
-                            if !isDrawing && viewModel.winner == nil {
-                                drawSection
-                            }
-                        }
-                    }
-                    .padding()
-                }
-
-                // Winner spotlight overlay
-                if showWinnerSpotlight, let winner = viewModel.winner {
-                    winnerSpotlight(for: winner)
-                }
-
-                if showConfetti {
-                    ConfettiView()
-                        .allowsHitTesting(false)
+                if showWinner, let winner = viewModel.winner {
+                    // Winner revealed - show card centered
+                    winnerDisplay(for: winner)
+                } else if isSpinning {
+                    // Spinning carousel
+                    spinningCarousel
                 }
             }
-            .navigationTitle("Closeout")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(placement: .principal) {
+                    Text("Your Reward")
+                        .font(.headline)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if showWinner {
+                        Button("Done") { dismiss() }
+                    }
+                }
+            }
+            .onAppear {
+                if autoStart && !isSpinning && viewModel.winner == nil {
+                    startSpin()
                 }
             }
         }
@@ -77,196 +53,72 @@ struct MonthCloseoutView: View {
 }
 
 private extension MonthCloseoutView {
-    func winnerSection(for item: WantedItemDisplay) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Image(systemName: "trophy.fill")
-                    .font(.title)
-                    .foregroundStyle(.yellow)
-                Text("🎉 Winner! 🎉")
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(.primary)
-                Image(systemName: "trophy.fill")
-                    .font(.title)
-                    .foregroundStyle(.yellow)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(alignment: .leading, spacing: 16) {
-                ItemCardView(item: item, image: imageProvider(item))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                LinearGradient(colors: [.yellow, .orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing),
-                                lineWidth: 4
-                            )
-                    )
-                    .shadow(color: .yellow.opacity(0.5), radius: 20, x: 0, y: 10)
-
-                if !item.tags.isEmpty {
-                    TagListView(tags: item.tags)
-                }
-            }
-        }
-        .padding(24)
-        .background(
-            LinearGradient(colors: [Color.yellow.opacity(0.15), Color.orange.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.yellow.opacity(0.3), lineWidth: 2)
-        )
-    }
-
-    var revealGridSection: some View {
+    var spinningCarousel: some View {
         let activeItems = viewModel.items.filter { $0.status == .active }
-        let _ = print("🎨 RevealGrid - Total items: \(viewModel.items.count), Active items: \(activeItems.count)")
-        let _ = viewModel.items.forEach { print("  - \($0.title): \($0.status)") }
+        let cardWidth: CGFloat = 200
+        let spacing: CGFloat = 20
+        let totalWidth = CGFloat(activeItems.count) * (cardWidth + spacing)
 
-        return VStack(alignment: .leading, spacing: 16) {
-            Text(isDrawing ? "Drawing..." : "Ready to spin")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(isDrawing ? Color.successFallback : Color.primaryFallback)
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                ForEach(activeItems) { item in
-                    revealGridItem(item)
+        return GeometryReader { geometry in
+            HStack(spacing: spacing) {
+                // Repeat items multiple times for continuous effect
+                ForEach(0..<5) { _ in
+                    ForEach(activeItems) { item in
+                        ItemCardView(item: item, image: imageProvider(item))
+                            .frame(width: cardWidth)
+                            .blur(radius: 10)
+                    }
                 }
             }
+            .offset(x: scrollOffset)
+            .frame(width: totalWidth * 5, alignment: .leading)
         }
+        .frame(height: 250)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    func revealGridItem(_ item: WantedItemDisplay) -> some View {
-        let isRevealed = revealedItems.contains(item.id)
-        let isWinner = viewModel.winner?.id == item.id
-
-        return ZStack {
-            ItemCardView(item: item, image: imageProvider(item))
-                .blur(radius: isRevealed ? 0 : 12)
-                .opacity(isDrawing ? (isRevealed && !isWinner ? 0.3 : 1.0) : 1.0)
-                .scaleEffect(isRevealed ? 1.0 : 0.95)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            isShimmering ? Color.accentFallback.opacity(0.6) : Color.clear,
-                            lineWidth: 2
-                        )
-                )
-                .shadow(
-                    color: isShimmering ? Color.accentFallback.opacity(0.3) : Color.clear,
-                    radius: isShimmering ? 8 : 0
-                )
-
-            // Frosted overlay when not revealed
-            if !isRevealed {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Image(systemName: "questionmark")
-                            .font(.system(size: 40, weight: .bold))
-                            .foregroundStyle(Color.secondaryFallback.opacity(0.5))
-                    )
-            }
-        }
-        .animation(.spring(response: 0.6, dampingFraction: 0.7), value: isRevealed)
-        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isShimmering)
-    }
-
-    var allItemsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("All items")
-                .font(.headline)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                ForEach(viewModel.items) { item in
-                    ItemCardView(item: item, image: imageProvider(item))
-                        .overlay(alignment: .topTrailing) {
-                            statusOverlay(for: item)
-                        }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    func statusOverlay(for item: WantedItemDisplay) -> some View {
-        switch item.status {
-        case .redeemed:
-            Label("Redeemed", systemImage: "checkmark.seal.fill")
-                .padding(8)
-                .background(Color.green.opacity(0.8))
-                .clipShape(Capsule())
-                .foregroundStyle(.white)
-                .padding(6)
-        case .skipped:
-            Label("Skipped", systemImage: "xmark")
-                .padding(8)
-                .background(Color.gray.opacity(0.6))
-                .clipShape(Capsule())
-                .foregroundStyle(.white)
-                .padding(6)
-        case .active:
-            EmptyView()
-        }
-    }
-
-    var drawSection: some View {
-        Button {
-            print("🎯 Draw Winner button tapped")
-            print("🎯 canDraw: \(viewModel.canDraw)")
-            print("🎯 isDrawing: \(isDrawing)")
-            print("🎯 Active items count: \(viewModel.items.filter { $0.status == .active }.count)")
-            startRevealAnimation()
-        } label: {
-            HStack {
-                Image(systemName: "gift.fill")
-                    .font(.title2)
-                Text("DRAW WINNER")
-                    .font(.title3)
-                    .fontWeight(.bold)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 64)
-            .background(
-                LinearGradient(
-                    colors: [Color.orange, Color.red],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .foregroundColor(.white)
-            .cornerRadius(CornerRadius.button)
-            .shadow(color: Color.orange.opacity(0.5), radius: 12, y: 6)
-        }
-        .disabled(!viewModel.canDraw || isDrawing)
-        .opacity((!viewModel.canDraw || isDrawing) ? 0.5 : 1.0)
-    }
-
-    func winnerSpotlight(for item: WantedItemDisplay) -> some View {
-        VStack(spacing: 24) {
+    func winnerDisplay(for item: WantedItemDisplay) -> some View {
+        VStack(spacing: Spacing.xl) {
             Spacer()
 
-            VStack(spacing: 16) {
-                // Trophy icon
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.yellow, .orange],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+            // Celebration header
+            VStack(spacing: Spacing.sm) {
+                // Trophy icon with particles
+                ZStack {
+                    // Glow effect
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.yellow.opacity(0.4), .clear],
+                                center: .center,
+                                startRadius: 15,
+                                endRadius: 50
+                            )
                         )
-                    )
-                    .shadow(color: .yellow.opacity(0.6), radius: 20)
+                        .frame(width: 100, height: 100)
 
-                Text("🎉 Winner! 🎉")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.yellow, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .yellow.opacity(0.6), radius: 15)
+                }
 
-                // Winner card
+                Text("🎉 Congratulations!")
+                    .font(.system(.title, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.primaryFallback)
+            }
+
+            // Winner card
+            VStack(spacing: Spacing.md) {
                 ItemCardView(item: item, image: imageProvider(item))
-                    .frame(maxWidth: 300)
+                    .frame(maxWidth: 320)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(
@@ -275,126 +127,168 @@ private extension MonthCloseoutView {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                lineWidth: 4
+                                lineWidth: 3
                             )
                     )
-                    .shadow(color: .yellow.opacity(0.6), radius: 30)
-                    .scaleEffect(1.1)
+                    .shadow(color: .yellow.opacity(0.5), radius: 24, y: 12)
+
+                if !item.tags.isEmpty {
+                    TagListView(tags: item.tags)
+                }
             }
-            .padding(32)
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.yellow.opacity(0.2),
-                                Color.orange.opacity(0.15)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(Color.yellow.opacity(0.4), lineWidth: 2)
-                    )
-            )
+            .scaleEffect(showWinner ? 1.0 : 0.8)
+            .opacity(showWinner ? 1.0 : 0.0)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7), value: showWinner)
+
+            // KPI Stats
+            // Items that were skipped (not selected as winner)
+            let skippedItems = viewModel.items.filter { $0.status == .skipped }
+            let skippedCount = skippedItems.count
+            let totalSaved = skippedItems.reduce(Decimal.zero) { $0 + $1.priceWithTax }
+
+            // Total items in the month
+            let totalItemsLogged = viewModel.items.count
+
+            // Savings rate: percentage of items not purchased (skipped + notPurchased)
+            let itemsNotPurchased = viewModel.items.filter { $0.status == .skipped || $0.status == .notPurchased }
+            let savingsRate = totalItemsLogged > 0 ? (Double(itemsNotPurchased.count) / Double(totalItemsLogged)) * 100 : 0
+
+            HStack(spacing: Spacing.md) {
+                // Money Saved
+                WinnerKPI(
+                    icon: "dollarsign.circle.fill",
+                    value: CurrencyFormatter.string(from: totalSaved),
+                    label: "Total Saved",
+                    color: Color.successFallback
+                )
+
+                // Temptations Resisted
+                WinnerKPI(
+                    icon: "hand.raised.fill",
+                    value: "\(skippedCount)",
+                    label: skippedCount == 1 ? "Temptation Resisted" : "Temptations Resisted",
+                    color: Color.orange
+                )
+
+                // Savings Rate
+                WinnerKPI(
+                    icon: "chart.line.uptrend.xyaxis",
+                    value: String(format: "%.0f%%", savingsRate),
+                    label: "Savings Rate",
+                    color: Color.blue
+                )
+            }
+            .padding(.horizontal, Spacing.md)
 
             Spacer()
         }
-        .transition(.scale.combined(with: .opacity))
+        .padding(Spacing.xl)
     }
 
-    func startRevealAnimation() {
-        print("🚀 startRevealAnimation called")
-
-        guard viewModel.canDraw else {
-            print("❌ Cannot draw - viewModel.canDraw is false")
-            return
-        }
+    func startSpin() {
+        guard viewModel.canDraw else { return }
 
         let candidates = viewModel.items.filter { $0.status == .active }
-        print("✅ Found \(candidates.count) active candidates")
+        guard !candidates.isEmpty else { return }
 
-        guard !candidates.isEmpty else {
-            print("❌ No candidates available")
-            return
-        }
-
-        print("✅ Starting animation sequence")
+        // Pick winner
+        guard let winnerCandidate = candidates.randomElement() else { return }
+        let winnerIndex = candidates.firstIndex(where: { $0.id == winnerCandidate.id }) ?? 0
 
         // Reset state
-        revealedItems.removeAll()
-        isDrawing = true
+        isSpinning = true
+        scrollOffset = 0
         HapticManager.shared.heavyImpact()
 
-        // Phase 1: Shimmer (1.5 seconds)
-        withAnimation {
-            isShimmering = true
-        }
-        print("✨ Shimmer phase started")
+        // Calculate target offset to center winner
+        let cardWidth: CGFloat = 200
+        let spacing: CGFloat = 20
+        let cardPlusSpacing = cardWidth + spacing
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            print("✨ Shimmer phase ended")
-            withAnimation {
-                isShimmering = false
+        // We repeat items 5 times, so use middle repetition (index 2)
+        let targetRepetition = 2
+        let totalCardsBeforeTarget = (targetRepetition * candidates.count) + winnerIndex
+        let centerScreen = UIScreen.main.bounds.width / 2
+        let finalOffset = centerScreen - (CGFloat(totalCardsBeforeTarget) * cardPlusSpacing) - (cardWidth / 2)
+
+        // Fast spin: move through many cards quickly
+        let spinDistance: CGFloat = -3000
+
+        // Phase 1: Fast spin (0.8 seconds)
+        withAnimation(.linear(duration: 0.8)) {
+            scrollOffset = spinDistance
+        }
+
+        // Phase 2: Slow down and land on winner (1.5 seconds with easeOut)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            withAnimation(.easeOut(duration: 1.5)) {
+                self.scrollOffset = finalOffset
             }
 
-            // Phase 2: Sequential reveals
-            print("🎲 Starting sequential reveals")
-            self.revealItemsSequentially(candidates: candidates)
+            // Haptic feedback during slowdown
+            HapticManager.shared.lightImpact()
+
+            // Final celebration - show winner
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                self.isSpinning = false
+                self.viewModel.setWinner(winnerCandidate)
+                HapticManager.shared.success()
+
+                withAnimation {
+                    self.showWinner = true
+                }
+            }
         }
     }
+}
 
-    func revealItemsSequentially(candidates: [WantedItemDisplay]) {
-        // First, draw the actual winner in the ViewModel
-        guard let winnerCandidate = candidates.randomElement() else { return }
+private struct WinnerKPI: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
 
-        // Prepare reveal order: shuffle all items, then ensure winner is last
-        var shuffled = candidates.shuffled()
-        if let winnerIndex = shuffled.firstIndex(where: { $0.id == winnerCandidate.id }) {
-            let winner = shuffled.remove(at: winnerIndex)
-            shuffled.append(winner)
-        }
+    var body: some View {
+        VStack(spacing: Spacing.sm) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 56, height: 56)
 
-        let delayIncrement = 0.3
-
-        for (index, item) in shuffled.enumerated() {
-            let delay = Double(index) * delayIncrement
-            let isLast = index == shuffled.count - 1
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                    revealedItems.insert(item.id)
-                }
-                HapticManager.shared.lightImpact()
-
-                if isLast {
-                    // This is the winner - trigger celebration
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        // Actually save the winner to Core Data
-                        viewModel.setWinner(winnerCandidate)
-                        HapticManager.shared.success()
-                        HapticManager.shared.heavyImpact()
-
-                        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                            showWinnerSpotlight = true
-                        }
-
-                        showConfetti = true
-
-                        // Hide spotlight after 3 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                            withAnimation {
-                                showWinnerSpotlight = false
-                                showConfetti = false
-                                isDrawing = false
-                            }
-                        }
-                    }
-                }
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(color)
             }
+
+            // Value
+            Text(value)
+                .font(.system(.title, design: .rounded))
+                .fontWeight(.bold)
+                .monospacedDigit()
+                .foregroundColor(Color.primaryFallback)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+
+            // Label
+            Text(label)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(Color.secondaryFallback)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.lg)
+        .padding(.horizontal, Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: CornerRadius.listRow)
+                .fill(Color.surfaceElevatedFallback)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.listRow)
+                .stroke(color.opacity(0.3), lineWidth: 1.5)
+        )
     }
 }
 
@@ -433,7 +327,8 @@ private extension MonthCloseoutView {
 
     return MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary,
                                                                haptics: container.hapticManager,
-                                                               settingsRepository: container.settingsRepository)) { _ in
+                                                               settingsRepository: container.settingsRepository),
+                            autoStart: true) { _ in
         nil
     }
 }

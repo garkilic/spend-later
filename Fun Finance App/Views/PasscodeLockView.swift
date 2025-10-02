@@ -37,7 +37,7 @@ struct PasscodeLockView: View {
             .buttonStyle(.bordered)
         }
         .padding()
-        .onChange(of: viewModel.isUnlocked) { _, newValue in
+        .onChange(of: viewModel.isUnlocked) { newValue in
             if newValue {
                 onUnlocked()
             }

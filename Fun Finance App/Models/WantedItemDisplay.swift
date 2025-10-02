@@ -11,6 +11,10 @@ struct WantedItemDisplay: Identifiable {
     let imagePath: String
     let status: ItemStatus
     let createdAt: Date
+
+    var hasPurchaseConfirmation: Bool {
+        return status == .purchased || status == .notPurchased
+    }
 }
 
 extension WantedItemDisplay: Hashable {

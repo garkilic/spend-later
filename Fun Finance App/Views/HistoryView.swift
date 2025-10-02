@@ -4,6 +4,9 @@ import UIKit
 struct HistoryView: View {
     @StateObject private var viewModel: HistoryViewModel
     @State private var selectedItem: WantedItemDisplay?
+    @State private var showingPurchaseConfirmation = false
+    @State private var showingNotBuyDialog = false
+    @State private var itemForConfirmation: WantedItemDisplay?
     private let timeFormatter: DateFormatter
     private let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
     private let onItemDeleted: (WantedItemDisplay) -> Void
@@ -36,6 +39,27 @@ struct HistoryView: View {
         .sheet(item: $selectedItem) { item in
             detailSheet(for: item)
         }
+        .alert("Not buying this item?", isPresented: $showingNotBuyDialog, presenting: itemForConfirmation) { item in
+            Button("Keep Saved") {
+                // Just dismiss - keep status as .redeemed
+                showingNotBuyDialog = false
+                itemForConfirmation = nil
+            }
+
+            Button("Delete", role: .destructive) {
+                viewModel.delete(item)
+                onItemDeleted(item)
+                showingNotBuyDialog = false
+                itemForConfirmation = nil
+            }
+
+            Button("Cancel", role: .cancel) {
+                showingNotBuyDialog = false
+                itemForConfirmation = nil
+            }
+        } message: { item in
+            Text("Choose whether to keep this item saved for later or delete it")
+        }
     }
 }
 
@@ -44,12 +68,12 @@ private extension HistoryView {
         Group {
             if viewModel.sections.isEmpty {
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: Spacing.xl) {
                         EmptyStateView(title: "No entries yet",
                                        message: "Every time you skip a purchase it will show up here, grouped by the day you logged it.")
                             .padding(.top, 80)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, Spacing.sideGutter)
                 }
             } else {
                 List {
@@ -62,17 +86,38 @@ private extension HistoryView {
                                     HistoryItemRow(item: item,
                                                    image: viewModel.image(for: item),
                                                    timeString: timeFormatter.string(from: item.createdAt),
-                                                   isWinner: viewModel.winnerItemIds.contains(item.id))
+                                                   isWinner: viewModel.winnerItemIds.contains(item.id),
+                                                   needsConfirmation: item.status == .redeemed)
                                 }
                                 .buttonStyle(.plain)
                                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                                 .listRowBackground(Color.clear)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        viewModel.delete(item)
-                                        onItemDeleted(item)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
+                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                    if item.status == .redeemed {
+                                        Button {
+                                            viewModel.confirmPurchase(item, purchased: true)
+                                        } label: {
+                                            Label("Bought", systemImage: "checkmark")
+                                        }
+                                        .tint(.green)
+                                    }
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    if item.status == .redeemed {
+                                        Button {
+                                            itemForConfirmation = item
+                                            showingNotBuyDialog = true
+                                        } label: {
+                                            Label("Not Buying", systemImage: "xmark")
+                                        }
+                                        .tint(.orange)
+                                    } else if item.status != .skipped {
+                                        Button(role: .destructive) {
+                                            viewModel.delete(item)
+                                            onItemDeleted(item)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
@@ -101,13 +146,16 @@ private extension HistoryView {
 private extension HistoryView {
     func detailSheet(for item: WantedItemDisplay) -> some View {
         let detailViewModel = makeDetailViewModel(item)
-        return ItemDetailView(viewModel: detailViewModel,
-                              imageProvider: { viewModel.image(for: $0) }) { deleted in
-            viewModel.delete(deleted)
-            onItemDeleted(deleted)
-            selectedItem = nil
-        } onUpdate: { _ in
-            viewModel.refresh()
+        return NavigationStack {
+            ItemDetailView(viewModel: detailViewModel,
+                          imageProvider: { viewModel.image(for: $0) }) { deleted in
+                viewModel.delete(deleted)
+                onItemDeleted(deleted)
+                selectedItem = nil
+            } onUpdate: { updated in
+                viewModel.refresh()
+                selectedItem = nil
+            }
         }
     }
 }
@@ -117,6 +165,7 @@ private struct HistoryItemRow: View {
     let image: UIImage?
     let timeString: String
     let isWinner: Bool
+    let needsConfirmation: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -150,6 +199,17 @@ private struct HistoryItemRow: View {
                         }
                         .foregroundStyle(Color.orange)
                     }
+                }
+                if needsConfirmation {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                        Text("Swipe to Confirm Purchase")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(Color.blue)
+                    .padding(.top, 4)
                 }
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)

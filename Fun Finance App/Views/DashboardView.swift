@@ -5,6 +5,9 @@ struct DashboardView: View {
     @StateObject private var addItemViewModel: AddItemViewModel
     @State private var showingAddSheet = false
     @State private var selectedItem: WantedItemDisplay?
+    @State private var showingGraph = false
+    @State private var itemToDelete: WantedItemDisplay?
+    @State private var showingDeleteConfirmation = false
     let onOpenSettings: () -> Void
     let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
 
@@ -56,9 +59,29 @@ struct DashboardView: View {
             .sheet(item: $selectedItem) { item in
                 detailSheet(for: item)
             }
-            .onChange(of: showingAddSheet) { _, isPresented in
+            .sheet(isPresented: $showingGraph) {
+                graphSheet
+            }
+            .alert("Delete Item?", isPresented: $showingDeleteConfirmation, presenting: itemToDelete) { item in
+                Button("Delete", role: .destructive) {
+                    viewModel.delete(item)
+                    showingDeleteConfirmation = false
+                    itemToDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    showingDeleteConfirmation = false
+                    itemToDelete = nil
+                }
+            } message: { item in
+                Text("Are you sure you want to delete \"\(item.title)\"?")
+            }
+            .onChange(of: showingAddSheet) { isPresented in
                 if !isPresented {
-                    viewModel.refresh()
+                    // Small delay to ensure Core Data changes are fully merged
+                    Task {
+                        try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                        viewModel.refresh()
+                    }
                     HapticManager.shared.success()
                 }
             }
@@ -82,23 +105,22 @@ private extension DashboardView {
     }
 
     var savingsHero: some View {
+        Button {
+            showingGraph = true
+            HapticManager.shared.lightImpact()
+        } label: {
+            heroContent
+        }
+        .buttonStyle(.plain)
+    }
+
+    var heroContent: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            // Title with icon
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.title3)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.successFallback, Color.successFallback.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Text("Willpower wins")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white.opacity(0.9))
-            }
+            // Title
+            Text("Willpower wins")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white.opacity(0.9))
 
             // Large amount
             Text(CurrencyFormatter.string(from: viewModel.totalSaved))
@@ -110,10 +132,9 @@ private extension DashboardView {
                 .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
 
             // Subtitle
-            Text("Saved this month by saying no to impulse buys")
-                .font(.footnote)
-                .foregroundColor(.white.opacity(0.85))
-                .padding(.top, 2)
+            Text("Saved this month")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.75))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Spacing.xl)
@@ -134,7 +155,7 @@ private extension DashboardView {
             y: 8
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Willpower wins: \(CurrencyFormatter.string(from: viewModel.totalSaved)) saved this month")
+        .accessibilityLabel("Willpower wins, saved this month: \(CurrencyFormatter.string(from: viewModel.totalSaved))")
     }
 
     var statsRow: some View {
@@ -192,6 +213,8 @@ private extension DashboardView {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("RECENT ACTIVITY")
                 .sectionHeaderStyle()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, Spacing.xs)
 
             if viewModel.items.isEmpty {
                 emptyState
@@ -230,6 +253,14 @@ private extension DashboardView {
                     .onTapGesture {
                         selectedItem = item
                         HapticManager.shared.lightImpact()
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            itemToDelete = item
+                            showingDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
             }
         }
@@ -270,14 +301,6 @@ private extension DashboardView {
         .padding(Spacing.md)
         .background(Color.surfaceElevatedFallback)
         .cornerRadius(CornerRadius.listRow)
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
-                viewModel.delete(item)
-                HapticManager.shared.mediumImpact()
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(item.title), saved \(CurrencyFormatter.string(from: item.priceWithTax)), \(item.createdAt.formatted(date: .abbreviated, time: .omitted))")
     }
@@ -290,7 +313,7 @@ private extension DashboardView {
             HStack {
                 Image(systemName: "plus.circle.fill")
                     .font(.title3)
-                Text("Log a Win")
+                Text("Log a Potential Purchase")
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
@@ -306,8 +329,8 @@ private extension DashboardView {
         }
         .padding(.horizontal, Spacing.sideGutter)
         .padding(.bottom, Spacing.md)
-        .accessibilityLabel("Log a win")
-        .accessibilityHint("Opens form to log a resisted purchase")
+        .accessibilityLabel("Log a potential purchase")
+        .accessibilityHint("Opens form to log a purchase you're considering")
     }
 
     var undoBanner: some View {
@@ -336,14 +359,26 @@ private extension DashboardView {
 
     func detailSheet(for item: WantedItemDisplay) -> some View {
         let detailViewModel = makeDetailViewModel(item)
-        return ItemDetailView(viewModel: detailViewModel,
-                              imageProvider: { viewModel.image(for: $0) }) { deleted in
-            viewModel.delete(deleted)
-            selectedItem = nil
-        } onUpdate: { updated in
-            selectedItem = updated
-            viewModel.refresh()
+        return NavigationStack {
+            ItemDetailView(viewModel: detailViewModel,
+                          imageProvider: { viewModel.image(for: $0) }) { deleted in
+                viewModel.delete(deleted)
+                selectedItem = nil
+            } onUpdate: { updated in
+                selectedItem = updated
+                viewModel.refresh()
+            }
         }
+    }
+
+    var graphSheet: some View {
+        // Simple placeholder with current month data for now
+        MonthlySavingsGraphView(
+            monthlyData: [
+                (Calendar.current.monthSymbols[Calendar.current.component(.month, from: Date()) - 1], viewModel.totalSaved)
+            ],
+            totalSaved: viewModel.totalSaved
+        )
     }
 }
 

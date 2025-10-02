@@ -16,13 +16,19 @@ struct PeriodFilterPicker: View {
 
 #if DEBUG
 #Preview {
-    @Previewable @State var period: FilterPeriod = .month
+    struct PreviewWrapper: View {
+        @State private var period: FilterPeriod = .month
 
-    VStack {
-        PeriodFilterPicker(selectedPeriod: $period)
-            .padding()
+        var body: some View {
+            VStack {
+                PeriodFilterPicker(selectedPeriod: $period)
+                    .padding()
 
-        Text("Selected: \(period.rawValue)")
+                Text("Selected: \(period.rawValue)")
+            }
+        }
     }
+
+    return PreviewWrapper()
 }
 #endif

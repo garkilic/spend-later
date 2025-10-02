@@ -5,6 +5,9 @@ struct ItemDetailView: View {
     @StateObject private var viewModel: ItemDetailViewModel
     @State private var isEditing = false
     @State private var showDeleteConfirmation = false
+    @State private var showingImagePicker = false
+    @State private var showingImageSourcePicker = false
+    @State private var imageSource: PhotoSource = .library
 
     let imageProvider: (WantedItemDisplay) -> UIImage?
     let onDelete: (WantedItemDisplay) -> Void
@@ -29,6 +32,11 @@ struct ItemDetailView: View {
             tagsSection
             linkSection
 
+            // Redemption confirmation section for winner items
+            if viewModel.item.status == .redeemed && !viewModel.item.hasPurchaseConfirmation {
+                redemptionSection
+            }
+
             Section {
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
@@ -40,6 +48,11 @@ struct ItemDetailView: View {
         .navigationTitle(viewModel.item.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                if isEditing {
+                    Button("Cancel") { cancelEditing() }
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 if isEditing {
                     Button("Save") { saveChanges() }
@@ -63,6 +76,27 @@ struct ItemDetailView: View {
                 Text(message)
             }
         }
+        .confirmationDialog("Choose Image Source", isPresented: $showingImageSourcePicker) {
+            Button("Camera") {
+                imageSource = .camera
+                showingImagePicker = true
+            }
+            Button("Photo Library") {
+                imageSource = .library
+                showingImagePicker = true
+            }
+            Button("Remove Image") {
+                viewModel.editedImage = nil
+                viewModel.hasImageChanged = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            PhotoPickerView(source: imageSource) { image in
+                viewModel.editedImage = image
+                viewModel.hasImageChanged = true
+            }
+        }
         .onAppear { viewModel.refreshFromStore() }
     }
 }
@@ -70,37 +104,119 @@ struct ItemDetailView: View {
 private extension ItemDetailView {
     var imageSection: some View {
         Section {
-            Group {
-                if let image = imageProvider(viewModel.item) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                } else {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(height: 200)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                        )
+            VStack(spacing: Spacing.sm) {
+                Group {
+                    // Show edited image if available, otherwise show original
+                    if let editedImage = viewModel.editedImage {
+                        Image(uiImage: editedImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else if viewModel.hasImageChanged {
+                        // User removed the image
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(height: 200)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.secondary)
+                            )
+                    } else if let image = imageProvider(viewModel.item) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(height: 200)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.secondary)
+                            )
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+
+                if isEditing {
+                    Button {
+                        showingImageSourcePicker = true
+                    } label: {
+                        Label("Change Image", systemImage: "photo.on.rectangle.angled")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+        }
+    }
+
+    var redemptionSection: some View {
+        Section {
+            VStack(spacing: Spacing.md) {
+                HStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .font(.title2)
+                        .foregroundStyle(.orange)
+
+                    Text("Did you claim this reward?")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text("Let us know if you actually bought this item to adjust your savings total.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: Spacing.md) {
+                    Button {
+                        viewModel.confirmPurchase(purchased: true)
+                        onUpdate(viewModel.item)
+                    } label: {
+                        Label("Yes, I bought it", systemImage: "checkmark.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+
+                    Button {
+                        viewModel.confirmPurchase(purchased: false)
+                        onUpdate(viewModel.item)
+                    } label: {
+                        Label("No, I didn't", systemImage: "xmark.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(.vertical, Spacing.sm)
+        } header: {
+            Text("Redemption Confirmation")
         }
     }
 
     var infoSection: some View {
         Section("Price") {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(CurrencyFormatter.string(from: viewModel.item.price))
-                    .font(.title3)
-                if viewModel.item.priceWithTax != viewModel.item.price {
-                    Text("With tax: \(CurrencyFormatter.string(from: viewModel.item.priceWithTax))")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+            if isEditing {
+                HStack {
+                    Text("$")
+                    TextField("0.00", text: $viewModel.priceText)
+                        .keyboardType(.decimalPad)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CurrencyFormatter.string(from: viewModel.item.price))
+                        .font(.title3)
+                    if viewModel.item.priceWithTax != viewModel.item.price {
+                        Text("With tax: \(CurrencyFormatter.string(from: viewModel.item.priceWithTax))")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -172,6 +288,13 @@ private extension ItemDetailView {
             onUpdate(viewModel.item)
             isEditing = false
         }
+    }
+
+    func cancelEditing() {
+        viewModel.refreshFromStore()
+        viewModel.editedImage = nil
+        viewModel.hasImageChanged = false
+        isEditing = false
     }
 
 }

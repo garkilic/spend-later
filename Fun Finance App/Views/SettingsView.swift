@@ -17,21 +17,6 @@ struct SettingsView: View {
                     Toggle("Weekly willpower reminder", isOn: Binding(get: { viewModel.weeklyReminderEnabled }, set: { viewModel.toggleWeeklyReminder($0) }))
                 }
 
-                Section("Pricing") {
-                    HStack {
-                        Text("Tax rate")
-                        Spacer()
-                        TextField("0", value: $viewModel.taxRatePercent, format: .number.precision(.fractionLength(0...2)))
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                        Text("%")
-                            .foregroundStyle(.secondary)
-                    }
-                    Text("Totals use this rate on top of base prices.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
                 Section("Passcode") {
                     Toggle("Require passcode", isOn: Binding(get: { viewModel.passcodeEnabled }, set: { handlePasscodeToggle($0) }))
                     if let error = viewModel.errorMessage {

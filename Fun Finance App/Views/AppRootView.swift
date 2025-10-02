@@ -26,6 +26,7 @@ struct AppRootView: View {
     @State private var showingSettings = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showingOnboarding = false
+    @State private var hasCheckedOnboarding = false
 
     init(container: AppContainer) {
         self.container = container
@@ -83,7 +84,7 @@ struct AppRootView: View {
                 .tag(Tab.reward)
 
         }
-        .onChange(of: selectedTab) { oldValue, newValue in
+        .onChange(of: selectedTab) { newValue in
             if newValue == .add {
                 DispatchQueue.main.async {
                     showingAddSheet = true
@@ -96,7 +97,8 @@ struct AppRootView: View {
         .sheet(item: $closeoutSummary) { summary in
             MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary,
                                                                 haptics: container.hapticManager,
-                                                                settingsRepository: container.settingsRepository)) { item in
+                                                                settingsRepository: container.settingsRepository),
+                             autoStart: true) { item in
                 container.imageStore.loadImage(named: item.imagePath)
             }
         }
@@ -107,6 +109,12 @@ struct AppRootView: View {
         }
         .sheet(isPresented: $showingAddSheet) {
             AddItemSheet(viewModel: addItemViewModel)
+        }
+        .onChange(of: showingAddSheet) { isPresented in
+            if !isPresented {
+                // Refresh history when add sheet is dismissed
+                historyViewModel.refresh()
+            }
         }
         .sheet(isPresented: $showingOnboarding) {
             OnboardingView {
@@ -123,18 +131,34 @@ struct AppRootView: View {
             historyViewModel.refresh()
             rewardViewModel.refresh()
             settingsViewModel.load()
-            if !hasCompletedOnboarding {
-                showingOnboarding = true
+
+            // Delay onboarding check to ensure it appears on top of everything
+            if !hasCheckedOnboarding {
+                hasCheckedOnboarding = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if !hasCompletedOnboarding {
+                        showingOnboarding = true
+                    }
+                }
             }
+
             Task { await checkRollover() }
             Task { await refreshLockState() }
         }
-        .onChange(of: scenePhase) { _, newValue in
+        .onChange(of: scenePhase) { newValue in
             if newValue == .active {
+                // Always return to dashboard when app becomes active
+                selectedTab = .dashboard
                 Task {
                     await checkRollover()
                     await refreshLockState()
                 }
+            }
+        }
+        .onChange(of: isLocked) { newValue in
+            // Return to dashboard after unlocking
+            if !newValue {
+                selectedTab = .dashboard
             }
         }
     }

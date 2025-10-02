@@ -46,8 +46,9 @@ private enum ModelVersion: String {
     case v1 = "SpendLaterModelV1"
     case v2 = "SpendLaterModelV2"
     case v3 = "SpendLaterModelV3"
+    case v4 = "SpendLaterModelV4"
 
-    static var current: ModelVersion { .v3 }
+    static var current: ModelVersion { .v4 }
 }
 
 private extension PersistenceController {
@@ -120,12 +121,21 @@ private extension PersistenceController {
             properties.append(productURL)
         }
 
-        if version == .v3 {
+        if version == .v3 || version == .v4 {
             let tagsRaw = NSAttributeDescription()
             tagsRaw.name = "tagsRaw"
             tagsRaw.attributeType = .stringAttributeType
             tagsRaw.isOptional = true
             properties.append(tagsRaw)
+        }
+
+        if version == .v4 {
+            let actuallyPurchased = NSAttributeDescription()
+            actuallyPurchased.name = "actuallyPurchased"
+            actuallyPurchased.attributeType = .booleanAttributeType
+            actuallyPurchased.isOptional = false
+            actuallyPurchased.defaultValue = false
+            properties.append(actuallyPurchased)
         }
 
         let imagePath = NSAttributeDescription()

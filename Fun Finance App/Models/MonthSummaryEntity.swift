@@ -17,6 +17,21 @@ extension MonthSummaryEntity {
         (items?.allObjects as? [WantedItemEntity]) ?? []
     }
 
+    var adjustedTotalSaved: Decimal {
+        let baseTotal = totalSaved.decimalValue
+
+        // Find winner item
+        guard let winnerId = winnerItemId else { return baseTotal }
+        guard let winner = wantedItems.first(where: { $0.id == winnerId }) else { return baseTotal }
+
+        // If user confirmed they purchased, subtract from total
+        if winner.actuallyPurchased {
+            return max(0, baseTotal - winner.price.decimalValue)
+        }
+
+        return baseTotal
+    }
+
     static func fetchRequest(forMonthKey monthKey: String) -> NSFetchRequest<MonthSummaryEntity> {
         let request = NSFetchRequest<MonthSummaryEntity>(entityName: "MonthSummary")
         request.predicate = NSPredicate(format: "monthKey == %@", monthKey)

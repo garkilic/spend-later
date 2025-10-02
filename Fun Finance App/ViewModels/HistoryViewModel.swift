@@ -35,7 +35,7 @@ final class HistoryViewModel: ObservableObject {
             summaries = summaryEntities.map { entity in
                 MonthSummaryDisplay(id: entity.id,
                                     monthKey: entity.monthKey,
-                                    totalSaved: includeTax(on: entity.totalSaved.decimalValue),
+                                    totalSaved: includeTax(on: entity.adjustedTotalSaved),
                                     itemCount: Int(entity.itemCount),
                                     winnerItemId: entity.winnerItemId,
                                     closedAt: entity.closedAt)
@@ -93,6 +93,15 @@ final class HistoryViewModel: ObservableObject {
             assertionFailure("Failed to delete item: \(error)")
         }
     }
+
+    func confirmPurchase(_ display: WantedItemDisplay, purchased: Bool) {
+        do {
+            try itemRepository.confirmPurchase(itemId: display.id, purchased: purchased)
+            refresh()
+        } catch {
+            assertionFailure("Failed to confirm purchase: \(error)")
+        }
+    }
 }
 
 extension HistoryViewModel {
@@ -108,9 +117,15 @@ extension HistoryViewModel {
 
 private extension HistoryViewModel {
     func makeSections(from entities: [WantedItemEntity]) -> [HistorySection] {
-        let statuses: [ItemStatus] = [.redeemed, .skipped, .active]
-        return statuses.compactMap { status in
-            let filtered = entities.filter { $0.status == status }
+        // Define sections and their corresponding statuses
+        let sectionConfig: [(sectionStatus: ItemStatus, includedStatuses: [ItemStatus])] = [
+            (.redeemed, [.redeemed, .active]), // "Saved" includes both redeemed winners and active items
+            (.purchased, [.purchased]),         // "Purchased" includes confirmed purchases
+            (.skipped, [.skipped])              // "Won" includes items that were skipped
+        ]
+
+        return sectionConfig.compactMap { config in
+            let filtered = entities.filter { config.includedStatuses.contains($0.status) }
             guard !filtered.isEmpty else { return nil }
 
             let displays = filtered
@@ -131,8 +146,8 @@ private extension HistoryViewModel {
                 }
 
             let subtotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
-            return HistorySection(status: status,
-                                  title: title(for: status),
+            return HistorySection(status: config.sectionStatus,
+                                  title: title(for: config.sectionStatus),
                                   items: displays,
                                   subtotal: subtotal)
         }
@@ -143,9 +158,13 @@ private extension HistoryViewModel {
         case .active:
             return "Active"
         case .skipped:
-            return "Skipped"
+            return "Won"
         case .redeemed:
-            return "Redeemed"
+            return "Saved"
+        case .purchased:
+            return "Purchased"
+        case .notPurchased:
+            return "Not Purchased"
         }
     }
 

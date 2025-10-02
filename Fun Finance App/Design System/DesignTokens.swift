@@ -141,11 +141,10 @@ struct SectionHeaderStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.footnote)
+            .fontWeight(.semibold)
             .textCase(.uppercase)
             .tracking(0.02 * 12) // 2% of footnote size ~12pt
             .foregroundColor(Color.secondaryFallback)
-            .padding(.top, Spacing.sectionTop)
-            .padding(.horizontal, Spacing.sideGutter)
     }
 }
 

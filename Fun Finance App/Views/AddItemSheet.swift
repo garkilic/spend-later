@@ -40,7 +40,7 @@ struct AddItemSheet: View {
                     }
                 }
             }
-            .navigationTitle("Log a Win")
+            .navigationTitle("Log a Purchase")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -76,8 +76,8 @@ struct AddItemSheet: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
-            .onChange(of: focusedField) { oldValue, newValue in
-                if oldValue == .url, newValue != .url {
+            .onChange(of: focusedField) { newValue in
+                if newValue != .url {
                     viewModel.requestLinkPreview()
                 }
             }
