@@ -78,7 +78,7 @@ private extension HistoryView {
                 ScrollView {
                     VStack(spacing: Spacing.xl) {
                         EmptyStateView(title: "No entries yet",
-                                       message: "Every time you skip a purchase it will show up here, grouped by the day you logged it.")
+                                       message: "Every time you resist an impulse it will show up here, grouped by the day you logged it.")
                             .padding(.top, 80)
                     }
                     .padding(.horizontal, Spacing.sideGutter)
@@ -100,6 +100,7 @@ private extension HistoryView {
                                 .buttonStyle(.plain)
                                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                                 .listRowBackground(Color.clear)
+                                .id(item.id)
                                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                     if item.status == .redeemed {
                                         Button {

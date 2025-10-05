@@ -84,7 +84,7 @@ struct AppRootView: View {
                 .tag(Tab.reward)
 
         }
-        .onChange(of: selectedTab) { newValue in
+        .onChange(of: selectedTab) { _, newValue in
             if newValue == .add {
                 DispatchQueue.main.async {
                     showingAddSheet = true
@@ -110,7 +110,7 @@ struct AppRootView: View {
         .sheet(isPresented: $showingAddSheet) {
             AddItemSheet(viewModel: addItemViewModel)
         }
-        .onChange(of: showingAddSheet) { isPresented in
+        .onChange(of: showingAddSheet) { _, isPresented in
             if !isPresented {
                 // Refresh history when add sheet is dismissed
                 historyViewModel.refresh()
@@ -145,7 +145,7 @@ struct AppRootView: View {
             Task { await checkRollover() }
             Task { await refreshLockState() }
         }
-        .onChange(of: scenePhase) { newValue in
+        .onChange(of: scenePhase) { _, newValue in
             if newValue == .active {
                 // Always return to dashboard when app becomes active
                 selectedTab = .dashboard
@@ -155,7 +155,7 @@ struct AppRootView: View {
                 }
             }
         }
-        .onChange(of: isLocked) { newValue in
+        .onChange(of: isLocked) { _, newValue in
             // Return to dashboard after unlocking
             if !newValue {
                 selectedTab = .dashboard

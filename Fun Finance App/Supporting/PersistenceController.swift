@@ -23,6 +23,13 @@ final class PersistenceController {
         } else {
             let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             let storeURL = urls[0].appendingPathComponent("SpendLater.sqlite")
+
+            // Ensure directory exists
+            let storeDirectory = storeURL.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: storeDirectory.path) {
+                try? FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true, attributes: nil)
+            }
+
             let description = NSPersistentStoreDescription(url: storeURL)
             description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)

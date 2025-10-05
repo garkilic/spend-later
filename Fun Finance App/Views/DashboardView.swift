@@ -75,14 +75,12 @@ struct DashboardView: View {
             } message: { item in
                 Text("Are you sure you want to delete \"\(item.title)\"?")
             }
-            .onChange(of: showingAddSheet) { isPresented in
+            .onChange(of: showingAddSheet) { _, isPresented in
                 if !isPresented {
-                    // Small delay to ensure Core Data changes are fully merged
-                    Task {
-                        try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                    // Refresh on next run loop to ensure Core Data changes are merged
+                    Task { @MainActor in
                         viewModel.refresh()
                     }
-                    HapticManager.shared.success()
                 }
             }
             .onAppear { viewModel.refresh() }
@@ -164,7 +162,7 @@ private extension DashboardView {
                 icon: "flame.fill",
                 title: "",
                 value: "\(viewModel.itemCount)",
-                subtitle: "purchases avoided",
+                subtitle: "impulses resisted",
                 color: Color(red: 1.0, green: 0.3, blue: 0.3)
             )
 
@@ -172,7 +170,7 @@ private extension DashboardView {
                 icon: "dollarsign.circle.fill",
                 title: "",
                 value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
-                subtitle: "Avg per item skipped",
+                subtitle: "Avg. Impulse Cost",
                 color: Color.successFallback
             )
         }
@@ -242,7 +240,7 @@ private extension DashboardView {
                 .font(.headline)
                 .foregroundColor(Color.primaryFallback)
 
-            Text("Log your first resisted purchase below")
+            Text("Log your first resisted impulse below")
                 .font(.subheadline)
                 .foregroundColor(Color.secondaryFallback)
                 .multilineTextAlignment(.center)
@@ -321,7 +319,7 @@ private extension DashboardView {
             HStack {
                 Image(systemName: "plus.circle.fill")
                     .font(.title3)
-                Text("Log a Potential Purchase")
+                Text("Record Impulse")
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
@@ -337,8 +335,8 @@ private extension DashboardView {
         }
         .padding(.horizontal, Spacing.sideGutter)
         .padding(.bottom, Spacing.md)
-        .accessibilityLabel("Log a potential purchase")
-        .accessibilityHint("Opens form to log a purchase you're considering")
+        .accessibilityLabel("Record impulse")
+        .accessibilityHint("Opens form to record an impulse you resisted")
     }
 
     var undoBanner: some View {

@@ -15,39 +15,79 @@ final class AddItemViewModel: ObservableObject {
     @Published var isSaving: Bool = false
     @Published var isFetchingPreview: Bool = false
     @Published var errorMessage: String?
+    @Published private(set) var isValid: Bool = false
 
     private let itemRepository: ItemRepositoryProtocol
     private let linkPreviewService: LinkPreviewServicing
     private var resolvedProductURL: URL?
     private var previewTask: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
+    private var isInitialLoad = true
 
     init(itemRepository: ItemRepositoryProtocol,
          linkPreviewService: LinkPreviewServicing? = nil) {
         self.itemRepository = itemRepository
         self.linkPreviewService = linkPreviewService ?? LinkPreviewService()
-    }
 
-    var isValid: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && price > 0
+        // Debounced validation - only validate after user stops typing for 200ms
+        Publishers.CombineLatest($title, $price)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .map { title, price in
+                !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && price > 0
+            }
+            .removeDuplicates() // Only update when validation state actually changes
+            .assign(to: \.isValid, on: self)
+            .store(in: &cancellables)
+
+        // Auto-trigger URL preview when user stops typing for 500ms
+        // Skip initial empty value to prevent lag on first load
+        $urlText
+            .dropFirst() // Skip initial empty value
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .sink { [weak self] newURL in
+                guard let self else { return }
+                let trimmed = newURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    Task { @MainActor in
+                        await self.loadPreviewInternal(for: trimmed)
+                    }
+                } else {
+                    self.previewImage = nil
+                    self.resolvedProductURL = nil
+                }
+            }
+            .store(in: &cancellables)
     }
 
     deinit {
         previewTask?.cancel()
+        cancellables.removeAll()
     }
 
     func requestLinkPreview() {
-        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Manual trigger - cancel existing and fetch immediately
         previewTask?.cancel()
+        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmed.isEmpty else {
             resolvedProductURL = nil
             previewImage = nil
+            isFetchingPreview = false
             return
         }
 
-        previewTask = Task { [weak self] in
-            guard let self else { return }
-            await self.loadPreview(for: trimmed)
+        Task { @MainActor in
+            await loadPreviewInternal(for: trimmed)
+        }
+    }
+
+    private func loadPreviewInternal(for urlString: String) async {
+        // Cancel any existing preview task
+        previewTask?.cancel()
+
+        previewTask = Task { @MainActor in
+            await self.loadPreview(for: urlString)
         }
     }
 

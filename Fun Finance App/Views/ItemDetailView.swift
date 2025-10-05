@@ -6,8 +6,9 @@ struct ItemDetailView: View {
     @State private var isEditing = false
     @State private var showDeleteConfirmation = false
     @State private var showingImagePicker = false
+    @State private var showingCamera = false
     @State private var showingImageSourcePicker = false
-    @State private var imageSource: PhotoSource = .library
+    @State private var cameraError: String?
 
     let imageProvider: (WantedItemDisplay) -> UIImage?
     let onDelete: (WantedItemDisplay) -> Void
@@ -82,11 +83,9 @@ struct ItemDetailView: View {
             PhotoSourcePickerView(
                 hasExistingPhoto: viewModel.editedImage != nil || imageProvider(viewModel.item) != nil,
                 onSelectCamera: {
-                    imageSource = .camera
-                    showingImagePicker = true
+                    showingCamera = true
                 },
                 onSelectLibrary: {
-                    imageSource = .library
                     showingImagePicker = true
                 },
                 onRemovePhoto: {
@@ -97,9 +96,40 @@ struct ItemDetailView: View {
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingImagePicker) {
-            PhotoPickerView(source: imageSource) { image in
+            PhotoPickerView(onImagePicked: { image in
                 viewModel.editedImage = image
                 viewModel.hasImageChanged = true
+            }, onError: { error in
+                cameraError = error
+            })
+        }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraView(onImageCaptured: { image in
+                viewModel.editedImage = image
+                viewModel.hasImageChanged = true
+            }, onError: { error in
+                cameraError = error
+            })
+            .ignoresSafeArea()
+        }
+        .alert("Camera Error", isPresented: Binding(
+            get: { cameraError != nil },
+            set: { if !$0 { cameraError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                cameraError = nil
+            }
+            if cameraError?.contains("Settings") == true {
+                Button("Open Settings") {
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsURL)
+                    }
+                    cameraError = nil
+                }
+            }
+        } message: {
+            if let error = cameraError {
+                Text(error)
             }
         }
         .onAppear { viewModel.refreshFromStore() }

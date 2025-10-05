@@ -7,8 +7,9 @@ struct TestView: View {
     @State private var timeRemaining: String = ""
     @State private var daysRemaining: Int = 0
     @State private var canSpin: Bool = false
+    @State private var timerCancellable: AnyCancellable?
+    @Environment(\.scenePhase) private var scenePhase
     let imageProvider: (WantedItemDisplay) -> UIImage?
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init(viewModel: TestViewModel, imageProvider: @escaping (WantedItemDisplay) -> UIImage?) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -54,11 +55,39 @@ struct TestView: View {
             .onAppear {
                 viewModel.refresh()
                 updateCountdown()
+                startTimer()
             }
-            .onReceive(timer) { _ in
-                updateCountdown()
+            .onDisappear {
+                stopTimer()
+            }
+            .onChange(of: scenePhase) { newPhase in
+                switch newPhase {
+                case .active:
+                    updateCountdown()
+                    startTimer()
+                case .inactive, .background:
+                    stopTimer()
+                @unknown default:
+                    break
+                }
             }
         }
+    }
+
+    private func startTimer() {
+        // Only update every second if less than 1 hour remaining, otherwise update every minute
+        let interval: TimeInterval = daysRemaining == 0 && canSpin == false ? 1.0 : 60.0
+
+        timerCancellable = Timer.publish(every: interval, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in
+                updateCountdown()
+            }
+    }
+
+    private func stopTimer() {
+        timerCancellable?.cancel()
+        timerCancellable = nil
     }
 
     private func updateCountdown() {
@@ -71,6 +100,7 @@ struct TestView: View {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
+            stopTimer()
             return
         }
 
@@ -87,6 +117,7 @@ struct TestView: View {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
+            stopTimer()
             return
         }
 
@@ -95,6 +126,7 @@ struct TestView: View {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
+            stopTimer()
         } else if days > 1 {
             timeRemaining = "\(days) days"
             daysRemaining = days
@@ -115,6 +147,7 @@ struct TestView: View {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
+            stopTimer()
         }
     }
 }
@@ -303,7 +336,7 @@ private extension TestView {
                     Image(systemName: "star.fill")
                         .foregroundStyle(Color.yellow)
                         .font(.caption)
-                    Text("You've already saved \(CurrencyFormatter.string(from: viewModel.totalSaved)) by skipping \(viewModel.itemCount) \(viewModel.itemCount == 1 ? "purchase" : "purchases")!")
+                    Text("You've already saved \(CurrencyFormatter.string(from: viewModel.totalSaved)) by resisting \(viewModel.itemCount) \(viewModel.itemCount == 1 ? "impulse" : "impulses")!")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(Color.successFallback)

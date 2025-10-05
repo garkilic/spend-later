@@ -36,9 +36,6 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func refresh() {
-        isLoading = true
-        defer { isLoading = false }
-
         do {
             errorMessage = nil
             try reloadTaxRate()
@@ -105,10 +102,23 @@ private extension DashboardViewModel {
     }
 
     func apply(displays: [WantedItemDisplay]) {
-        self.items = displays
-        totalSaved = displays.reduce(.zero) { $0 + $1.priceWithTax }
-        itemCount = displays.count
-        averageItemPrice = itemCount > 0 ? totalSaved / Decimal(itemCount) : .zero
+        let newTotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
+        let newCount = displays.count
+        let newAverage = newCount > 0 ? newTotal / Decimal(newCount) : .zero
+
+        // Only update if values changed to avoid unnecessary UI updates
+        if items.count != displays.count || items != displays {
+            self.items = displays
+        }
+        if totalSaved != newTotal {
+            self.totalSaved = newTotal
+        }
+        if itemCount != newCount {
+            self.itemCount = newCount
+        }
+        if averageItemPrice != newAverage {
+            self.averageItemPrice = newAverage
+        }
     }
 
     func updateReviewAvailability() {
