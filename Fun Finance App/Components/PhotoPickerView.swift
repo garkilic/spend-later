@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import AVFoundation
 
 enum PhotoSource {
     case camera
@@ -17,16 +18,13 @@ struct PhotoPickerView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         switch source {
         case .camera:
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                let controller = UIImagePickerController()
-                controller.sourceType = .camera
-                controller.delegate = context.coordinator
-                controller.cameraCaptureMode = .photo
-                controller.allowsEditing = false
-                return controller
-            } else {
-                return makeLibraryController(context: context)
-            }
+            let controller = UIImagePickerController()
+            controller.sourceType = .camera
+            controller.delegate = context.coordinator
+            controller.cameraCaptureMode = .photo
+            controller.allowsEditing = false
+            controller.mediaTypes = ["public.image"]
+            return controller
         case .library:
             return makeLibraryController(context: context)
         }

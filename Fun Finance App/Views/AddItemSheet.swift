@@ -44,11 +44,6 @@ struct AddItemSheet: View {
                     Button("Save") { Task { await save() } }
                         .disabled(!viewModel.isValid)
                 }
-                ToolbarItem(placement: .keyboard) {
-                    Button("Done") {
-                        focusedField = nil
-                    }
-                }
             }
             .sheet(isPresented: $showingPhotoPicker) {
                 PhotoPickerView(source: photoSource) { image in
