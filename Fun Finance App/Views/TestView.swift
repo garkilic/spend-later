@@ -25,14 +25,6 @@ struct TestView: View {
                     VStack(alignment: .leading, spacing: Spacing.cardSpacing) {
                         countdownHero
                         currentMonthCard
-
-                        #if DEBUG
-                        if viewModel.itemCount == 0 {
-                            developerToolsCard
-                        } else {
-                            testingToolsCard
-                        }
-                        #endif
                     }
                     .padding(.horizontal, Spacing.sideGutter)
                     .padding(.top, Spacing.safeAreaTop)
@@ -473,77 +465,6 @@ private extension TestView {
         .padding(.vertical, Spacing.lg)
     }
 
-    var developerToolsCard: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            HStack {
-                Image(systemName: "wrench.and.screwdriver.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.secondaryFallback)
-                Text("Developer Tools")
-                    .font(.headline)
-                    .foregroundColor(Color.primaryFallback)
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                viewModel.clearAllData()
-                HapticManager.shared.mediumImpact()
-            } label: {
-                Label("Clear All Data", systemImage: "trash.fill")
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .buttonStyle(.bordered)
-            .tint(.red)
-        }
-        .padding(Spacing.xl)
-        .cardStyle()
-    }
-
-    var testingToolsCard: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            HStack {
-                Image(systemName: "ladybug.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.orange)
-                Text("Testing Tools")
-                    .font(.headline)
-                    .foregroundColor(Color.primaryFallback)
-            }
-
-            Divider()
-
-            Button {
-                viewModel.createTestSummary()
-                showingCloseout = true
-                HapticManager.shared.success()
-            } label: {
-                Label("🧪 Force Spin (Test)", systemImage: "sparkles")
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .buttonStyle(.bordered)
-            .tint(.orange)
-
-            if viewModel.testSummary != nil {
-                Button {
-                    viewModel.resetTestSummary()
-                    HapticManager.shared.lightImpact()
-                } label: {
-                    Label("Reset Draw", systemImage: "arrow.counterclockwise")
-                        .font(.subheadline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                }
-                .buttonStyle(.bordered)
-            }
-        }
-        .padding(Spacing.xl)
-        .cardStyle()
-    }
 }
 
 private struct HowItWorksRow: View {
