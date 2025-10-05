@@ -12,6 +12,7 @@ typealias PhotoHandler = (UIImage) -> Void
 struct PhotoPickerView: UIViewControllerRepresentable {
     let source: PhotoSource
     let onImagePicked: PhotoHandler
+    @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UIViewController {
         switch source {
@@ -21,6 +22,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
                 controller.sourceType = .camera
                 controller.delegate = context.coordinator
                 controller.cameraCaptureMode = .photo
+                controller.allowsEditing = false
                 return controller
             } else {
                 return makeLibraryController(context: context)

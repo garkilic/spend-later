@@ -162,17 +162,17 @@ private extension DashboardView {
         HStack(spacing: Spacing.cardSpacing) {
             statCard(
                 icon: "flame.fill",
-                title: "Impulses resisted",
+                title: "",
                 value: "\(viewModel.itemCount)",
-                subtitle: "this month",
+                subtitle: "purchases avoided",
                 color: Color(red: 1.0, green: 0.3, blue: 0.3)
             )
 
             statCard(
                 icon: "dollarsign.circle.fill",
-                title: "Average avoided spend",
+                title: "",
                 value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
-                subtitle: "per purchase",
+                subtitle: "Avg per item skipped",
                 color: Color.successFallback
             )
         }
@@ -188,6 +188,14 @@ private extension DashboardView {
             }
 
             Spacer()
+
+            if !title.isEmpty {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.secondaryFallback)
+                    .textCase(.uppercase)
+            }
 
             Text(value)
                 .font(.system(.title2, design: .rounded))
@@ -206,7 +214,7 @@ private extension DashboardView {
         .frame(height: 120)
         .cardStyle()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title): \(value), \(subtitle)")
+        .accessibilityLabel(title.isEmpty ? "\(value), \(subtitle)" : "\(title): \(value), \(subtitle)")
     }
 
     var recentActivitySection: some View {

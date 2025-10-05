@@ -25,11 +25,13 @@ struct TestView: View {
                         countdownHero
                         currentMonthCard
 
+                        #if DEBUG
                         if viewModel.itemCount == 0 {
                             developerToolsCard
                         } else {
                             testingToolsCard
                         }
+                        #endif
                     }
                     .padding(.horizontal, Spacing.sideGutter)
                     .padding(.top, Spacing.safeAreaTop)
@@ -63,36 +65,52 @@ struct TestView: View {
         let now = Date()
         let calendar = Calendar.current
 
-        // Get the last day of current month at 11:59:59 PM
-        guard let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: calendar.startOfDay(for: now)),
-              let lastSecondOfMonth = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: endOfMonth) else {
+        // Get the last day of the current month
+        guard let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start,
+              let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) else {
+            timeRemaining = "Ready!"
+            daysRemaining = 0
+            canSpin = true
             return
         }
 
-        let components = calendar.dateComponents([.day, .hour, .minute, .second], from: now, to: lastSecondOfMonth)
+        // Unlock time is the start of the last day of the month
+        let unlockTime = calendar.startOfDay(for: endOfMonth)
 
-        if let days = components.day, let hours = components.hour, let minutes = components.minute, let seconds = components.second {
-            if days > 1 {
-                timeRemaining = "\(days) days"
-                daysRemaining = days
-                canSpin = false
-            } else if days == 1 {
-                timeRemaining = "\(days) day"
-                daysRemaining = days
-                canSpin = false
-            } else if hours > 0 {
-                timeRemaining = "\(hours)h \(minutes)m"
-                daysRemaining = 0
-                canSpin = false
-            } else if minutes > 0 {
-                timeRemaining = "\(minutes)m \(seconds)s"
-                daysRemaining = 0
-                canSpin = false
-            } else {
-                timeRemaining = "Ready!"
-                daysRemaining = 0
-                canSpin = true
-            }
+        // Calculate time remaining
+        let components = calendar.dateComponents([.day, .hour, .minute, .second], from: now, to: unlockTime)
+
+        guard let days = components.day,
+              let hours = components.hour,
+              let minutes = components.minute,
+              let seconds = components.second else {
+            timeRemaining = "Ready!"
+            daysRemaining = 0
+            canSpin = true
+            return
+        }
+
+        // If we've passed the unlock time, allow spinning
+        if now >= unlockTime {
+            timeRemaining = "Ready!"
+            daysRemaining = 0
+            canSpin = true
+        } else if days > 1 {
+            timeRemaining = "\(days) days"
+            daysRemaining = days
+            canSpin = false
+        } else if days == 1 {
+            timeRemaining = "\(days) day"
+            daysRemaining = days
+            canSpin = false
+        } else if hours > 0 {
+            timeRemaining = "\(hours)h \(minutes)m"
+            daysRemaining = 0
+            canSpin = false
+        } else if minutes > 0 {
+            timeRemaining = "\(minutes)m \(seconds)s"
+            daysRemaining = 0
+            canSpin = false
         } else {
             timeRemaining = "Ready!"
             daysRemaining = 0

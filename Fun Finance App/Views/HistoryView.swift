@@ -26,10 +26,18 @@ struct HistoryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(colors: [Color(.systemGroupedBackground), Color(red: 0.93, green: 0.98, blue: 0.95)],
-                               startPoint: .topLeading,
-                               endPoint: .bottomTrailing)
-                    .ignoresSafeArea()
+                // Match Dashboard background gradient
+                LinearGradient(
+                    colors: [
+                        Color.surfaceFallback,
+                        Color.surfaceElevatedFallback
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .opacity(0.06)
+                .background(Color.surfaceFallback)
+                .ignoresSafeArea()
 
                 content
             }

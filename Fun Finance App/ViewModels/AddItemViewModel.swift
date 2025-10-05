@@ -6,6 +6,7 @@ import UIKit
 final class AddItemViewModel: ObservableObject {
     @Published var title: String = ""
     @Published var price: Decimal = .zero
+    @Published var priceText: String = ""
     @Published var notes: String = ""
     @Published var tagsText: String = ""
     @Published var urlText: String = ""
@@ -78,10 +79,23 @@ final class AddItemViewModel: ObservableObject {
         }
     }
 
+    func updatePriceFromText() {
+        let cleaned = priceText.replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespaces)
+
+        if let decimal = Decimal(string: cleaned) {
+            price = decimal
+        } else if cleaned.isEmpty {
+            price = .zero
+        }
+    }
+
     func clear() {
         previewTask?.cancel()
         title = ""
         price = .zero
+        priceText = ""
         notes = ""
         tagsText = ""
         image = nil
@@ -116,6 +130,7 @@ private extension AddItemViewModel {
             // Auto-fill price if found and current price is zero
             if price == .zero, let fetchedPrice = metadata.price, fetchedPrice > 0 {
                 price = fetchedPrice
+                priceText = String(format: "%.2f", NSDecimalNumber(decimal: fetchedPrice).doubleValue)
             }
 
             previewImage = metadata.image ?? metadata.icon

@@ -62,12 +62,14 @@ struct ItemDetailView: View {
                 }
             }
         }
-        .confirmationDialog("Delete \(viewModel.item.title)?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .alert("Delete \(viewModel.item.title)?", isPresented: $showDeleteConfirmation, presenting: viewModel.item) { item in
             Button("Delete", role: .destructive) {
-                onDelete(viewModel.item)
+                onDelete(item)
                 dismiss()
             }
             Button("Cancel", role: .cancel) {}
+        } message: { item in
+            Text("Are you sure you want to delete this item?")
         }
         .alert("Error", isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { _ in viewModel.errorMessage = nil })) {
             Button("OK", role: .cancel) {}
@@ -76,20 +78,23 @@ struct ItemDetailView: View {
                 Text(message)
             }
         }
-        .confirmationDialog("Choose Image Source", isPresented: $showingImageSourcePicker) {
-            Button("Camera") {
-                imageSource = .camera
-                showingImagePicker = true
-            }
-            Button("Photo Library") {
-                imageSource = .library
-                showingImagePicker = true
-            }
-            Button("Remove Image") {
-                viewModel.editedImage = nil
-                viewModel.hasImageChanged = true
-            }
-            Button("Cancel", role: .cancel) {}
+        .sheet(isPresented: $showingImageSourcePicker) {
+            PhotoSourcePickerView(
+                hasExistingPhoto: viewModel.editedImage != nil || imageProvider(viewModel.item) != nil,
+                onSelectCamera: {
+                    imageSource = .camera
+                    showingImagePicker = true
+                },
+                onSelectLibrary: {
+                    imageSource = .library
+                    showingImagePicker = true
+                },
+                onRemovePhoto: {
+                    viewModel.editedImage = nil
+                    viewModel.hasImageChanged = true
+                }
+            )
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingImagePicker) {
             PhotoPickerView(source: imageSource) { image in

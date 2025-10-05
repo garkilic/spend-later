@@ -23,16 +23,11 @@ struct AddItemSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                // Show preview prominently if we have one from URL
-                if viewModel.previewImage != nil {
-                    previewSection
-                }
-                linkSection
+                // Photo section always at top
+                photoSection
+
                 detailsSection
-                // Only show photo section if no preview image from URL
-                if viewModel.previewImage == nil {
-                    photoSection
-                }
+
                 if let error = viewModel.errorMessage {
                     Section {
                         Text(error)
@@ -53,8 +48,6 @@ struct AddItemSheet: View {
                     Button("Done") {
                         focusedField = nil
                     }
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
             .sheet(isPresented: $showingPhotoPicker) {
@@ -62,19 +55,14 @@ struct AddItemSheet: View {
                     viewModel.image = image
                 }
             }
-            .confirmationDialog("Add a photo", isPresented: $showingSourceChooser, titleVisibility: .visible) {
-                Button("Take Photo", systemImage: "camera") {
-                    launch(with: .camera)
-                }
-                Button("Choose from Library", systemImage: "photo.on.rectangle") {
-                    launch(with: .library)
-                }
-                if viewModel.image != nil {
-                    Button("Remove Photo", role: .destructive) {
-                        viewModel.image = nil
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
+            .sheet(isPresented: $showingSourceChooser) {
+                PhotoSourcePickerView(
+                    hasExistingPhoto: viewModel.image != nil,
+                    onSelectCamera: { launch(with: .camera) },
+                    onSelectLibrary: { launch(with: .library) },
+                    onRemovePhoto: viewModel.image != nil ? { viewModel.image = nil } : nil
+                )
+                .presentationDetents([.medium, .large])
             }
             .onChange(of: focusedField) { newValue in
                 if newValue != .url {
@@ -86,54 +74,27 @@ struct AddItemSheet: View {
 }
 
 private extension AddItemSheet {
-    var previewSection: some View {
-        Section("Product Image") {
-            if let preview = viewModel.previewImage {
-                Image(uiImage: preview)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 220)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .clipped()
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
-            }
-        }
-    }
-
-    var linkSection: some View {
-        Section("Product URL") {
-            TextField("https://example.com/product", text: $viewModel.urlText)
-                .keyboardType(.URL)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .focused($focusedField, equals: .url)
-                .submitLabel(.done)
-                .onSubmit { viewModel.requestLinkPreview() }
-
-            if viewModel.isFetchingPreview {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                    Text("Fetching preview…")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
     var photoSection: some View {
         Section("Photo") {
-        VStack(alignment: .center, spacing: 12) {
-            photoPreview
-            Text("Optional: attach a quick photo of what you resisted.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
+            VStack(alignment: .center, spacing: 12) {
+                // Show preview image from URL if available, otherwise show photo picker
+                if let preview = viewModel.previewImage {
+                    Image(uiImage: preview)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 220)
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .clipped()
+                } else {
+                    photoPreview
+                    Text("Optional: attach a quick photo of what you resisted.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -181,10 +142,48 @@ private extension AddItemSheet {
             TextField("Title", text: $viewModel.title)
                 .focused($focusedField, equals: .title)
                 .textContentType(.name)
-            TextField("Price (USD)", value: $viewModel.price, format: .currency(code: "USD"))
-                .keyboardType(.decimalPad)
-                .focused($focusedField, equals: .price)
-                .accessibilityLabel("Price in US dollars")
+                .submitLabel(.next)
+                .onSubmit {
+                    focusedField = .price
+                }
+
+            HStack {
+                Text("$")
+                    .foregroundColor(.secondary)
+                TextField("0.00", text: $viewModel.priceText)
+                    .keyboardType(.decimalPad)
+                    .focused($focusedField, equals: .price)
+                    .accessibilityLabel("Price in US dollars")
+                    .onChange(of: focusedField) { newValue in
+                        // Only update price when user leaves the field
+                        if newValue != .price {
+                            viewModel.updatePriceFromText()
+                        }
+                    }
+            }
+
+            // Product URL field
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Product URL (optional)", text: $viewModel.urlText)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .focused($focusedField, equals: .url)
+                    .submitLabel(.done)
+                    .onSubmit { viewModel.requestLinkPreview() }
+
+                if viewModel.isFetchingPreview {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.8)
+                        Text("Fetching preview…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             TextField("Notes (optional)", text: $viewModel.notes, axis: .vertical)
                 .lineLimit(3)
                 .focused($focusedField, equals: .notes)
