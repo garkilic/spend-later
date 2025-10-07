@@ -2,7 +2,15 @@ import SwiftUI
 import UIKit
 
 struct HistoryView: View {
+    enum HistoryTab: String, CaseIterable, Identifiable {
+        case months = "By Month"
+        case allItems = "All Items"
+
+        var id: String { rawValue }
+    }
+
     @StateObject private var viewModel: HistoryViewModel
+    @State private var selectedTab: HistoryTab = .months
     @State private var selectedItem: WantedItemDisplay?
     @State private var showingPurchaseConfirmation = false
     @State private var showingNotBuyDialog = false
@@ -26,23 +34,26 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Match Dashboard background gradient
-                LinearGradient(
-                    colors: [
-                        Color.surfaceFallback,
-                        Color.surfaceElevatedFallback
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .opacity(0.06)
-                .background(Color.surfaceFallback)
-                .ignoresSafeArea()
+            VStack(spacing: 0) {
+                // Custom tab picker
+                tabPicker
 
-                content
+                ZStack {
+                    backgroundGradient
+
+                    // Tab content
+                    TabView(selection: $selectedTab) {
+                        monthsTabContent
+                            .tag(HistoryTab.months)
+
+                        allItemsTabContent
+                            .tag(HistoryTab.allItems)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                }
             }
             .navigationTitle("History")
+            .navigationBarTitleDisplayMode(.large)
         }
         .onAppear { viewModel.refresh() }
         .sheet(item: $selectedItem) { item in
@@ -55,7 +66,6 @@ struct HistoryView: View {
         }
         .alert("Not buying this item?", isPresented: $showingNotBuyDialog, presenting: itemForConfirmation) { item in
             Button("Keep Saved") {
-                // Just dismiss - keep status as .redeemed
                 showingNotBuyDialog = false
                 itemForConfirmation = nil
             }
@@ -78,77 +88,94 @@ struct HistoryView: View {
 }
 
 private extension HistoryView {
-    var content: some View {
+    var backgroundGradient: some View {
+        LinearGradient(
+            colors: [Color.surfaceFallback, Color.surfaceElevatedFallback],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .opacity(0.06)
+        .background(Color.surfaceFallback)
+        .ignoresSafeArea()
+    }
+
+    var tabPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(HistoryTab.allCases) { tab in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedTab = tab
+                    }
+                    HapticManager.shared.lightImpact()
+                } label: {
+                    VStack(spacing: 8) {
+                        Text(tab.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(selectedTab == tab ? .semibold : .regular)
+                            .foregroundColor(selectedTab == tab ? Color.accentColor : Color.secondary)
+
+                        Rectangle()
+                            .fill(selectedTab == tab ? Color.accentColor : Color.clear)
+                            .frame(height: 2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.sm)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Color.surfaceElevatedFallback)
+    }
+
+    var monthsTabContent: some View {
         Group {
-            if viewModel.sections.isEmpty {
+            if viewModel.summaries.isEmpty {
                 ScrollView {
                     VStack(spacing: Spacing.xl) {
-                        EmptyStateView(title: "No entries yet",
-                                       message: "Every time you resist an impulse it will show up here, grouped by the day you logged it.")
+                        EmptyStateView(title: "No monthly history yet",
+                                       message: "Complete your first month to see monthly summaries here.")
                             .padding(.top, 80)
                     }
                     .padding(.horizontal, Spacing.sideGutter)
                 }
             } else {
                 List {
-                    // Monthly Summaries Section
-                    if !viewModel.summaries.isEmpty {
-                        Section("Monthly History") {
-                            ForEach(viewModel.summaries.prefix(6)) { summary in
-                                Button {
-                                    selectedMonthSummary = summary
-                                } label: {
-                                    monthSummaryRow(summary: summary)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                    ForEach(viewModel.summaries) { summary in
+                        Button {
+                            selectedMonthSummary = summary
+                        } label: {
+                            monthSummaryRow(summary: summary)
                         }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 8, leading: Spacing.sideGutter, bottom: 8, trailing: Spacing.sideGutter))
+                        .listRowBackground(Color.clear)
                     }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+        }
+    }
 
+    var allItemsTabContent: some View {
+        Group {
+            if viewModel.sections.isEmpty {
+                ScrollView {
+                    VStack(spacing: Spacing.xl) {
+                        EmptyStateView(title: "No items yet",
+                                       message: "Every impulse you resist will appear here, organized by date.")
+                            .padding(.top, 80)
+                    }
+                    .padding(.horizontal, Spacing.sideGutter)
+                }
+            } else {
+                List {
                     ForEach(viewModel.sections) { section in
                         Section(header: sectionHeader(for: section)) {
                             ForEach(section.items) { item in
-                                Button {
-                                    selectedItem = item
-                                } label: {
-                                    HistoryItemRow(item: item,
-                                                   image: viewModel.image(for: item),
-                                                   timeString: timeFormatter.string(from: item.createdAt),
-                                                   isWinner: viewModel.winnerItemIds.contains(item.id),
-                                                   needsConfirmation: item.status == .redeemed)
-                                }
-                                .buttonStyle(.plain)
-                                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                                .listRowBackground(Color.clear)
-                                .id(item.id)
-                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                    if item.status == .redeemed {
-                                        Button {
-                                            viewModel.confirmPurchase(item, purchased: true)
-                                        } label: {
-                                            Label("Bought", systemImage: "checkmark")
-                                        }
-                                        .tint(.green)
-                                    }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    if item.status == .redeemed {
-                                        Button {
-                                            itemForConfirmation = item
-                                            showingNotBuyDialog = true
-                                        } label: {
-                                            Label("Not Buying", systemImage: "xmark")
-                                        }
-                                        .tint(.orange)
-                                    } else if item.status != .skipped {
-                                        Button(role: .destructive) {
-                                            viewModel.delete(item)
-                                            onItemDeleted(item)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
-                                }
+                                itemRow(item)
                             }
                         }
                         .textCase(nil)
@@ -160,14 +187,59 @@ private extension HistoryView {
         }
     }
 
+    func itemRow(_ item: WantedItemDisplay) -> some View {
+        Button {
+            selectedItem = item
+        } label: {
+            HistoryItemRow(item: item,
+                           image: viewModel.image(for: item),
+                           timeString: timeFormatter.string(from: item.createdAt),
+                           isWinner: viewModel.winnerItemIds.contains(item.id),
+                           needsConfirmation: item.status == .redeemed)
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .listRowBackground(Color.clear)
+        .id(item.id)
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if item.status == .redeemed {
+                Button {
+                    viewModel.confirmPurchase(item, purchased: true)
+                } label: {
+                    Label("Bought", systemImage: "checkmark")
+                }
+                .tint(.green)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if item.status == .redeemed {
+                Button {
+                    itemForConfirmation = item
+                    showingNotBuyDialog = true
+                } label: {
+                    Label("Not Buying", systemImage: "xmark")
+                }
+                .tint(.orange)
+            } else if item.status != .skipped {
+                Button(role: .destructive) {
+                    viewModel.delete(item)
+                    onItemDeleted(item)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+    }
+
     func sectionHeader(for section: HistoryViewModel.HistorySection) -> some View {
         HStack {
             Text(section.title)
-                .font(.headline)
+                .font(.subheadline)
+                .fontWeight(.semibold)
             Spacer()
             Text(CurrencyFormatter.string(from: section.subtotal))
                 .font(.subheadline)
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(Color.successFallback)
         }
     }
 
@@ -176,39 +248,22 @@ private extension HistoryView {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(MonthFormatter.displayName(for: summary.monthKey))
-                    .font(.headline)
-                    .foregroundStyle(Color.appPrimary)
+                    .font(.body)
+                    .fontWeight(.medium)
 
-                HStack(spacing: 12) {
-                    Label("\(summary.itemCount)", systemImage: "list.bullet")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if summary.closedAt != nil {
-                        Label("Closed", systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.appSuccess)
-                    } else {
-                        Label("Active", systemImage: "clock")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                }
+                Text("\(summary.itemCount) items")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(CurrencyFormatter.string(from: summary.totalSaved))
-                    .font(.headline)
-                    .foregroundStyle(Color.appSuccess)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+            Text(CurrencyFormatter.string(from: summary.totalSaved))
+                .font(.body)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.successFallback)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 12)
     }
 }
 
@@ -247,7 +302,7 @@ private struct HistoryItemRow: View {
                     Spacer()
                     Text(CurrencyFormatter.string(from: item.priceWithTax))
                         .font(.headline)
-                        .foregroundStyle(isWinner ? Color.orange : Color(red: 0.0, green: 0.5, blue: 0.33))
+                        .foregroundStyle(isWinner ? Color.orange : Color.successFallback)
                 }
                 if item.priceWithTax != item.price {
                     Text("Base: \(CurrencyFormatter.string(from: item.price))")
@@ -298,7 +353,7 @@ private struct HistoryItemRow: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(isWinner ? Color.orange.opacity(0.3) : Color.black.opacity(0.05), lineWidth: isWinner ? 2 : 1)
+                .stroke(isWinner ? Color.orange.opacity(0.3) : Color.separatorFallback, lineWidth: isWinner ? 2 : 1)
         )
     }
 

@@ -85,7 +85,6 @@ struct DashboardView: View {
                     viewModel.refresh()
                 }
             }
-            .onAppear { viewModel.refresh() }
         }
     }
 }
@@ -141,7 +140,7 @@ private extension DashboardView {
                 title: "",
                 value: "\(viewModel.itemCount)",
                 subtitle: "impulses resisted",
-                color: Color(red: 1.0, green: 0.3, blue: 0.3)
+                color: .red
             )
 
             statCard(

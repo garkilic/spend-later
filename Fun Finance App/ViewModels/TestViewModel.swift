@@ -9,12 +9,14 @@ final class TestViewModel: ObservableObject {
     @Published var totalSaved: Decimal = .zero
     @Published var itemCount: Int = 0
     @Published var testSummary: MonthSummaryEntity?
+    @Published var pendingCloseout: MonthSummaryEntity?
 
     let haptics: HapticManager
     let settingsRepository: SettingsRepositoryProtocol
 
     private let itemRepository: ItemRepositoryProtocol
     private let monthRepository: MonthRepositoryProtocol
+    private let rolloverService: RolloverService
     private let imageStore: ImageStoring
     private let calendar: Calendar
     private var taxRate: Decimal = .zero
@@ -31,6 +33,11 @@ final class TestViewModel: ObservableObject {
         self.imageStore = imageStore
         self.haptics = haptics
         self.calendar = calendar
+        self.rolloverService = RolloverService(
+            monthRepository: monthRepository,
+            itemRepository: itemRepository,
+            calendar: calendar
+        )
     }
 
     func refresh() {
@@ -41,6 +48,9 @@ final class TestViewModel: ObservableObject {
             self.items = displays
             totalSaved = displays.reduce(.zero) { $0 + $1.priceWithTax }
             itemCount = displays.count
+
+            // Check for pending closeout
+            pendingCloseout = try rolloverService.evaluateIfNeeded()
         } catch {
             assertionFailure("Failed to fetch items: \(error)")
         }
@@ -206,6 +216,82 @@ final class TestViewModel: ObservableObject {
             try context.save()
         } catch {
             assertionFailure("Failed to populate review test data: \(error)")
+        }
+    }
+
+    func clearPendingCloseout() {
+        do {
+            guard let summary = pendingCloseout else { return }
+            let context = itemRepository.context
+
+            // Delete all items from this summary
+            for item in summary.wantedItems {
+                context.delete(item)
+            }
+
+            // Delete the summary
+            context.delete(summary)
+            try context.save()
+
+            refresh()
+        } catch {
+            assertionFailure("Failed to clear pending closeout: \(error)")
+        }
+    }
+
+    func createPendingCloseoutForTest() {
+        do {
+            // Create items for previous month
+            guard let previousDate = calendar.date(byAdding: .month, value: -1, to: Date()) else { return }
+            let previousMonthKey = itemRepository.monthKey(for: previousDate)
+
+            // Delete existing summary for this month if it exists
+            if let existingSummary = try monthRepository.summary(for: previousMonthKey) {
+                itemRepository.context.delete(existingSummary)
+            }
+
+            // Delete existing items
+            let existingItems = try itemRepository.items(for: previousMonthKey)
+            for item in existingItems {
+                try itemRepository.delete(item)
+            }
+
+            // Create test items
+            let testItems = [
+                ("Luxury Watch", Decimal(599.99), ["accessories", "luxury"]),
+                ("Premium Headphones", Decimal(349.99), ["audio", "tech"]),
+                ("Designer Bag", Decimal(450.00), ["fashion", "accessories"]),
+                ("Gaming Console", Decimal(499.99), ["gaming", "tech"])
+            ]
+
+            let context = itemRepository.context
+
+            for (title, price, tags) in testItems {
+                let item = WantedItemEntity(context: context)
+                item.id = UUID()
+                item.title = title
+                item.price = NSDecimalNumber(decimal: price)
+                item.notes = "Test closeout item"
+                item.productText = nil
+                item.productURL = nil
+                item.imagePath = ""
+                item.tags = tags
+                item.createdAt = previousDate
+                item.monthKey = previousMonthKey
+                item.status = .active
+            }
+
+            try context.save()
+
+            // Create summary and directly set it as pending (bypass date check for testing)
+            let summary = try monthRepository.createSummary(for: previousMonthKey)
+
+            // Directly set as pending closeout (for testing)
+            pendingCloseout = summary
+
+            print("🧪 Test closeout created with \(summary.wantedItems.count) items")
+        } catch {
+            assertionFailure("Failed to create test closeout: \(error)")
         }
     }
 

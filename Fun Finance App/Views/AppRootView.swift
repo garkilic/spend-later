@@ -14,14 +14,13 @@ struct AppRootView: View {
 
     @StateObject private var dashboardViewModel: DashboardViewModel
     @StateObject private var addItemViewModel: AddItemViewModel
-    @StateObject private var historyViewModel: HistoryViewModel
-    @StateObject private var rewardViewModel: TestViewModel
-    @StateObject private var settingsViewModel: SettingsViewModel
     @StateObject private var passcodeViewModel: PasscodeViewModel
+    @State private var historyViewModel: HistoryViewModel?
+    @State private var rewardViewModel: TestViewModel?
+    @State private var settingsViewModel: SettingsViewModel?
 
     @State private var selectedTab: Tab = .dashboard
     @State private var lastNonAddTab: Tab = .dashboard
-    @State private var closeoutSummary: MonthSummaryEntity?
     @State private var isLocked = false
     @State private var showingAddSheet = false
     @State private var showingSettings = false
@@ -31,22 +30,21 @@ struct AppRootView: View {
 
     init(container: AppContainer) {
         self.container = container
-        _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(itemRepository: container.itemRepository,
-                                                                           monthRepository: container.monthRepository,
-                                                                           settingsRepository: container.settingsRepository,
-                                                                           imageStore: container.imageStore))
-        _addItemViewModel = StateObject(wrappedValue: AddItemViewModel(itemRepository: container.itemRepository))
-        _historyViewModel = StateObject(wrappedValue: HistoryViewModel(monthRepository: container.monthRepository,
-                                                                      itemRepository: container.itemRepository,
-                                                                      imageStore: container.imageStore,
-                                                                      settingsRepository: container.settingsRepository))
-        _rewardViewModel = StateObject(wrappedValue: TestViewModel(itemRepository: container.itemRepository,
-                                                                   monthRepository: container.monthRepository,
-                                                                   settingsRepository: container.settingsRepository,
-                                                                   imageStore: container.imageStore,
-                                                                   haptics: container.hapticManager))
-        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(settingsRepository: container.settingsRepository, passcodeManager: container.passcodeManager))
-        _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(passcodeManager: container.passcodeManager, settingsRepository: container.settingsRepository))
+
+        // Initialize core ViewModels needed immediately
+        // Others (History, Reward, Settings) are lazy-loaded on-demand
+        _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(
+            itemRepository: container.itemRepository,
+            monthRepository: container.monthRepository,
+            settingsRepository: container.settingsRepository,
+            imageStore: container.imageStore))
+
+        _addItemViewModel = StateObject(wrappedValue: AddItemViewModel(
+            itemRepository: container.itemRepository))
+
+        _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(
+            passcodeManager: container.passcodeManager,
+            settingsRepository: container.settingsRepository))
     }
 
     var body: some View {
@@ -69,23 +67,35 @@ struct AppRootView: View {
                 .tabItem { Label("Add", systemImage: "plus.circle.fill") }
                 .tag(Tab.add)
 
-            HistoryView(viewModel: historyViewModel,
-                        makeDetailViewModel: { item in
-                            ItemDetailViewModel(item: item,
-                                                itemRepository: container.itemRepository,
-                                                settingsRepository: container.settingsRepository)
-                        },
-                        onItemDeleted: { _ in
-                            dashboardViewModel.refresh()
-                        })
-                .tabItem { Label("History", systemImage: "clock") }
-                .tag(Tab.history)
-
-            TestView(viewModel: rewardViewModel) { item in
-                container.imageStore.loadImage(named: item.imagePath)
+            if let historyVM = historyViewModel {
+                HistoryView(viewModel: historyVM,
+                            makeDetailViewModel: { item in
+                                ItemDetailViewModel(item: item,
+                                                    itemRepository: container.itemRepository,
+                                                    settingsRepository: container.settingsRepository)
+                            },
+                            onItemDeleted: { _ in
+                                dashboardViewModel.refresh()
+                            })
+                    .tabItem { Label("History", systemImage: "clock") }
+                    .tag(Tab.history)
+            } else {
+                Color.clear
+                    .tabItem { Label("History", systemImage: "clock") }
+                    .tag(Tab.history)
             }
-                .tabItem { Label("Reward", systemImage: "gift.fill") }
-                .tag(Tab.reward)
+
+            if let rewardVM = rewardViewModel {
+                TestView(viewModel: rewardVM) { item in
+                    container.imageStore.loadImage(named: item.imagePath)
+                }
+                    .tabItem { Label("Reward", systemImage: "gift.fill") }
+                    .tag(Tab.reward)
+            } else {
+                Color.clear
+                    .tabItem { Label("Reward", systemImage: "gift.fill") }
+                    .tag(Tab.reward)
+            }
             }
         }
         .onChange(of: selectedTab) { _, newValue in
@@ -97,32 +107,48 @@ struct AppRootView: View {
             } else {
                 lastNonAddTab = newValue
 
-                // Lazy load tab data when first accessed
+                // Lazy load ViewModels and data when first accessed
                 switch newValue {
                 case .history:
-                    historyViewModel.refresh()
+                    if historyViewModel == nil {
+                        historyViewModel = HistoryViewModel(
+                            monthRepository: container.monthRepository,
+                            itemRepository: container.itemRepository,
+                            imageStore: container.imageStore,
+                            settingsRepository: container.settingsRepository)
+                    }
+                    historyViewModel?.refresh()
                 case .reward:
-                    rewardViewModel.refresh()
+                    if rewardViewModel == nil {
+                        rewardViewModel = TestViewModel(
+                            itemRepository: container.itemRepository,
+                            monthRepository: container.monthRepository,
+                            settingsRepository: container.settingsRepository,
+                            imageStore: container.imageStore,
+                            haptics: container.hapticManager)
+                    }
+                    rewardViewModel?.refresh()
                 default:
                     break
                 }
             }
         }
-        .sheet(item: $closeoutSummary) { summary in
-            MonthCloseoutView(viewModel: MonthCloseoutViewModel(summary: summary,
-                                                                haptics: container.hapticManager,
-                                                                settingsRepository: container.settingsRepository),
-                             autoStart: true) { item in
-                container.imageStore.loadImage(named: item.imagePath)
-            }
-        }
         .sheet(isPresented: $showingSettings) {
-            NavigationStack {
-                SettingsView(viewModel: settingsViewModel)
+            if let settingsVM = settingsViewModel {
+                NavigationStack {
+                    SettingsView(viewModel: settingsVM)
+                }
             }
         }
         .sheet(isPresented: $showingAddSheet) {
             AddItemSheet(viewModel: addItemViewModel)
+        }
+        .onChange(of: showingSettings) { _, isShowing in
+            if isShowing && settingsViewModel == nil {
+                settingsViewModel = SettingsViewModel(
+                    settingsRepository: container.settingsRepository,
+                    passcodeManager: container.passcodeManager)
+            }
         }
         .sheet(isPresented: $showingOnboarding) {
             OnboardingView {
@@ -135,7 +161,7 @@ struct AppRootView: View {
             }
         }
         .task {
-            // Check onboarding immediately
+            // Check onboarding first (synchronous, fast)
             if !hasCheckedOnboarding {
                 hasCheckedOnboarding = true
                 if !hasCompletedOnboarding {
@@ -144,19 +170,35 @@ struct AppRootView: View {
                 }
             }
 
-            // Load in background - UI shows immediately
-            await refreshLockState()
+            // Load lock state synchronously (it's fast, just reads UserDefaults)
+            do {
+                let settings = try container.settingsRepository.loadAppSettings()
+                passcodeViewModel.reset()
+                if settings.passcodeEnabled {
+                    passcodeViewModel.load()
+                    isLocked = true
+                } else {
+                    isLocked = false
+                }
+            } catch {
+                isLocked = false
+            }
 
-            // Only load dashboard if not locked
+            // Only load dashboard data if not locked
             if hasCompletedOnboarding && !isLocked {
                 dashboardViewModel.refresh()
             }
 
-            // Check rollover
-            await checkRollover()
-
-            // Preload PhotoPicker framework in background (for Record Impulse)
+            // Defer non-critical background work to avoid blocking UI
             Task.detached(priority: .background) {
+                // Wait 1 second to let UI settle
+                try? await Task.sleep(for: .seconds(1))
+
+                // Check for pending closeout but don't auto-show
+                // User must click button on Reward tab
+
+                // Preload PhotoPicker framework for Record Impulse (low priority)
+                try? await Task.sleep(for: .seconds(2))
                 _ = await PHPhotoLibrary.authorizationStatus(for: .readWrite)
             }
         }
@@ -166,16 +208,13 @@ struct AppRootView: View {
             // Return to dashboard when app becomes active
             selectedTab = .dashboard
 
-            Task.detached(priority: .userInitiated) { @MainActor in
-                await self.refreshLockState()
-
-                // Only refresh dashboard if not locked
-                if !self.isLocked {
-                    self.dashboardViewModel.refresh()
-                }
-
-                await self.checkRollover()
+            // Refresh lock state and dashboard data
+            refreshLockState()
+            if !isLocked {
+                dashboardViewModel.refresh()
             }
+
+            // Rollover check handled by Reward tab button
         }
         .onChange(of: isLocked) { _, newValue in
             // Return to dashboard after unlocking
@@ -190,17 +229,7 @@ struct AppRootView: View {
 }
 
 private extension AppRootView {
-    func checkRollover() async {
-        do {
-            if let summary = try container.rolloverService.evaluateIfNeeded() {
-                closeoutSummary = summary
-            }
-        } catch {
-            // ignore errors for now
-        }
-    }
-
-    func refreshLockState() async {
+    func refreshLockState() {
         do {
             let settings = try container.settingsRepository.loadAppSettings()
             passcodeViewModel.reset()

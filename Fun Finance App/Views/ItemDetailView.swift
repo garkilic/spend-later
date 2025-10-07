@@ -48,7 +48,9 @@ struct ItemDetailView: View {
                 errorAlertMessage
             }
             .sheet(isPresented: $showingImageSourcePicker, content: photoSourceSheet)
-            .onChange(of: photoPickerItem, perform: handlePhotoSelection)
+            .onChange(of: photoPickerItem) { _, newItem in
+                handlePhotoSelection(newItem)
+            }
             .fullScreenCover(isPresented: $showingCamera, content: cameraView)
             .alert("Camera Error", isPresented: cameraErrorBinding) {
                 cameraErrorActions
@@ -381,9 +383,7 @@ private extension ItemDetailView {
             } else {
                 Button {
                     isEditing = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        focusedField = .title
-                    }
+                    focusedField = .title
                 } label: {
                     HStack(spacing: 12) {
                         Text(viewModel.item.title)
@@ -420,9 +420,7 @@ private extension ItemDetailView {
             } else {
                 Button {
                     isEditing = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        focusedField = .notes
-                    }
+                    focusedField = .notes
                 } label: {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -459,9 +457,7 @@ private extension ItemDetailView {
             } else {
                 Button {
                     isEditing = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        focusedField = .tags
-                    }
+                    focusedField = .tags
                 } label: {
                     HStack(alignment: .center, spacing: 12) {
                         if viewModel.item.tags.isEmpty {

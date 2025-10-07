@@ -7,6 +7,9 @@ struct TestView: View {
     @State private var timeRemaining: String = ""
     @State private var daysRemaining: Int = 0
     @State private var canSpin: Bool = false
+    @State private var countdownTimer: Timer?
+    @State private var pulseAnimation: Bool = false
+    @State private var rotationAnimation: Double = 0
     let imageProvider: (WantedItemDisplay) -> UIImage?
 
     init(viewModel: TestViewModel, imageProvider: @escaping (WantedItemDisplay) -> UIImage?) {
@@ -32,7 +35,7 @@ struct TestView: View {
             .navigationTitle("Monthly Reward")
             .navigationBarTitleDisplayMode(.large)
             .sheet(isPresented: $showingCloseout) {
-                if let summary = viewModel.testSummary {
+                if let summary = viewModel.pendingCloseout {
                     MonthCloseoutView(viewModel: MonthCloseoutViewModel(
                         summary: summary,
                         haptics: HapticManager.shared,
@@ -42,57 +45,80 @@ struct TestView: View {
                     }
                 }
             }
+            .onChange(of: showingCloseout) { _, isShowing in
+                if !isShowing {
+                    // Refresh after closeout to update pending state
+                    viewModel.refresh()
+                    updateCountdown()
+                }
+            }
+            .onChange(of: viewModel.pendingCloseout) { _, _ in
+                // Update countdown when pending closeout changes
+                updateCountdown()
+            }
             .onAppear {
                 viewModel.refresh()
                 updateCountdown()
+                // Start timer to update countdown every hour
+                countdownTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
+                    viewModel.refresh()
+                    updateCountdown()
+                }
+            }
+            .onDisappear {
+                countdownTimer?.invalidate()
+                countdownTimer = nil
             }
         }
     }
 
     private func updateCountdown() {
-        let now = Date()
-        let calendar = Calendar.current
+        // Check if we have a pending closeout (month ready to spin)
+        guard viewModel.pendingCloseout != nil else {
+            // No pending closeout - calculate time until month end
+            let now = Date()
+            let calendar = Calendar.current
 
-        // Get the last day of the current month
-        guard let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start,
-              let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) else {
-            timeRemaining = "Ready!"
-            daysRemaining = 0
-            canSpin = true
+            // Get the last day of the current month
+            guard let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start,
+                  let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) else {
+                timeRemaining = "Not Available"
+                daysRemaining = 0
+                canSpin = false
+                return
+            }
+
+            // Unlock time is the start of the last day of the month
+            let unlockTime = calendar.startOfDay(for: endOfMonth)
+
+            // Calculate time remaining
+            let components = calendar.dateComponents([.day], from: now, to: unlockTime)
+
+            guard let days = components.day else {
+                timeRemaining = "Not Available"
+                daysRemaining = 0
+                canSpin = false
+                return
+            }
+
+            if days > 1 {
+                timeRemaining = "\(days) days"
+                daysRemaining = days
+            } else if days == 1 {
+                timeRemaining = "1 day"
+                daysRemaining = days
+            } else {
+                timeRemaining = "< 1 day"
+                daysRemaining = 0
+            }
+            canSpin = false
             return
         }
 
-        // Unlock time is the start of the last day of the month
-        let unlockTime = calendar.startOfDay(for: endOfMonth)
-
-        // Calculate time remaining
-        let components = calendar.dateComponents([.day, .hour, .minute, .second], from: now, to: unlockTime)
-
-        guard let days = components.day else {
-            timeRemaining = "Ready!"
-            daysRemaining = 0
-            canSpin = true
-            return
-        }
-
-        // If we've passed the unlock time, allow spinning
-        if now >= unlockTime {
-            timeRemaining = "Ready!"
-            daysRemaining = 0
-            canSpin = true
-        } else if days > 1 {
-            timeRemaining = "\(days) days"
-            daysRemaining = days
-            canSpin = false
-        } else if days == 1 {
-            timeRemaining = "\(days) day"
-            daysRemaining = days
-            canSpin = false
-        } else {
-            timeRemaining = "< 1 day"
-            daysRemaining = 0
-            canSpin = false
-        }
+        // We have a pending closeout - button is ready!
+        timeRemaining = "Ready!"
+        daysRemaining = 0
+        canSpin = true
     }
 }
 
@@ -112,81 +138,240 @@ private extension TestView {
 
     var countdownHero: some View {
         VStack(spacing: Spacing.lg) {
-            // Gift icon with pulsing effect
+            if canSpin {
+                readyToSpinContent
+            } else {
+                lockedStateContent
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(heroBackground)
+        .overlay(heroOverlay)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(canSpin ? "Ready to spin for your reward" : "Monthly reward unlocks in \(timeRemaining)")
+    }
+
+    private var readyToSpinContent: some View {
+        VStack(spacing: Spacing.xl) {
+            animatedGiftIcon
+            readyToSpinText
+            spinButton
+        }
+        .padding(Spacing.xl)
+    }
+
+    private var animatedGiftIcon: some View {
+        ZStack {
+            pulsingGlowRings
+            giftIconBackground
+            giftIcon
+            rotatingSparkles
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear {
+            pulseAnimation = true
+            withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
+                rotationAnimation = 360
+            }
+        }
+    }
+
+    private var pulsingGlowRings: some View {
+        ForEach(0..<3) { index in
+            let ringGradient = LinearGradient(
+                colors: [.yellow.opacity(0.3), .orange.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Circle()
+                .stroke(ringGradient, lineWidth: 2)
+                .frame(width: 140 + CGFloat(index * 20), height: 140 + CGFloat(index * 20))
+                .opacity(0.6 - Double(index) * 0.2)
+                .scaleEffect(pulseAnimation ? 1.1 : 1.0)
+                .animation(
+                    .easeInOut(duration: 1.5)
+                    .repeatForever(autoreverses: true)
+                    .delay(Double(index) * 0.2),
+                    value: pulseAnimation
+                )
+        }
+    }
+
+    private var giftIconBackground: some View {
+        let backgroundGradient = LinearGradient(
+            colors: [.yellow.opacity(0.3), .orange.opacity(0.4)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        return Circle()
+            .fill(backgroundGradient)
+            .frame(width: 120, height: 120)
+            .scaleEffect(pulseAnimation ? 1.05 : 1.0)
+            .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: pulseAnimation)
+    }
+
+    private var giftIcon: some View {
+        let iconGradient = LinearGradient(
+            colors: [.yellow, .orange],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        return Image(systemName: "gift.fill")
+            .font(.system(size: 56))
+            .foregroundStyle(iconGradient)
+            .shadow(color: .yellow.opacity(0.5), radius: 8, x: 0, y: 4)
+            .rotationEffect(.degrees(pulseAnimation ? 5 : -5))
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseAnimation)
+    }
+
+    private var rotatingSparkles: some View {
+        ForEach(0..<8) { index in
+            let angle = Double(index) * .pi / 4 + rotationAnimation * .pi / 180
+            let xOffset = cos(angle) * 80
+            let yOffset = sin(angle) * 80
+
+            Image(systemName: "sparkle")
+                .font(.system(size: 12))
+                .foregroundStyle(.yellow)
+                .offset(x: xOffset, y: yOffset)
+                .opacity(0.8)
+                .scaleEffect(pulseAnimation ? 1.2 : 1.0)
+                .animation(
+                    .easeInOut(duration: 1.0)
+                    .repeatForever(autoreverses: true)
+                    .delay(Double(index) * 0.1),
+                    value: pulseAnimation
+                )
+        }
+    }
+
+    private var readyToSpinText: some View {
+        VStack(spacing: Spacing.xs) {
+            Text("🎉 IT'S TIME!")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundStyle(.orange)
+                .textCase(.uppercase)
+                .tracking(2)
+
+            let textGradient = LinearGradient(
+                colors: [.orange, .yellow, .orange],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            Text("Ready to Spin")
+                .font(.system(size: 42, weight: .black, design: .rounded))
+                .foregroundStyle(textGradient)
+                .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
+        }
+    }
+
+    private var spinButton: some View {
+        Button {
+            showingCloseout = true
+            HapticManager.shared.success()
+        } label: {
+            let buttonGradient = LinearGradient(
+                colors: [.orange, .yellow, .orange],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                Text("Spin for Your Reward!")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Image(systemName: "sparkles")
+                    .font(.title2)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 64)
+            .background(buttonGradient)
+            .foregroundColor(.white)
+            .cornerRadius(CornerRadius.button)
+            .shadow(color: .orange.opacity(0.5), radius: 12, x: 0, y: 6)
+        }
+    }
+
+    private var lockedStateContent: some View {
+        VStack(spacing: Spacing.lg) {
             ZStack {
-                // Outer ring
                 Circle()
-                    .fill(Color.orange.opacity(0.15))
-                    .frame(width: 140, height: 140)
-
-                // Middle ring
-                Circle()
-                    .fill(Color.orange.opacity(0.25))
-                    .frame(width: 100, height: 100)
-
-                // Gift icon
-                Image(systemName: canSpin ? "gift.fill" : "lock.fill")
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 120, height: 120)
+                Image(systemName: "lock.fill")
                     .font(.system(size: 48))
-                    .foregroundColor(canSpin ? .yellow : .orange)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
 
-            // Countdown display
             VStack(spacing: Spacing.xs) {
-                Text(canSpin ? "🎉 Ready to Spin!" : "Reward unlocks in")
+                Text("Reward unlocks in")
                     .font(.subheadline)
                     .foregroundColor(Color.secondaryFallback)
                     .fontWeight(.medium)
-
                 Text(timeRemaining)
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundColor(canSpin ? Color.successFallback : Color.primaryFallback)
+                    .foregroundColor(Color.primaryFallback)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
 
-            // Spin button integrated in hero card
-            if viewModel.itemCount > 0 {
-                Button {
-                    viewModel.createTestSummary()
-                    showingCloseout = true
-                    HapticManager.shared.success()
-                } label: {
+            if viewModel.itemCount > 0 || viewModel.pendingCloseout != nil {
+                Button {} label: {
                     HStack(spacing: 12) {
-                        Image(systemName: canSpin ? "gift.fill" : "lock.fill")
+                        Image(systemName: "lock.fill")
                             .font(.title3)
-                        if canSpin {
-                            Text("🎉 Spin for Your Reward!")
-                                .fontWeight(.bold)
-                        } else {
-                            Text(daysRemaining > 0 ? "Locked for \(daysRemaining) \(daysRemaining == 1 ? "Day" : "Days")" : "Locked Until Month End")
-                                .fontWeight(.bold)
-                        }
+                        Text(daysRemaining > 0 ? "Locked for \(daysRemaining) \(daysRemaining == 1 ? "Day" : "Days")" : "Locked Until Month End")
+                            .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(canSpin ? Color.successFallback : Color.gray)
-                .disabled(!canSpin)
+                .tint(Color.gray)
+                .disabled(true)
+            } else {
+                Text("Add items this month to earn a reward")
+                    .font(.subheadline)
+                    .foregroundColor(Color.secondaryFallback)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
         }
         .padding(Spacing.xl)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: CornerRadius.card)
-                .fill(canSpin ? Color.successFallback.opacity(0.06) : Color.surfaceElevatedFallback)
+    }
+
+    private var heroBackground: some View {
+        let readyGradient = LinearGradient(
+            colors: [Color.orange.opacity(0.15), Color.yellow.opacity(0.1), Color.orange.opacity(0.15)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: CornerRadius.card)
-                .stroke(
-                    canSpin ? Color.successFallback.opacity(0.3) : Color.clear,
-                    lineWidth: 2
-                )
+        let lockedGradient = LinearGradient(
+            colors: [Color.surfaceElevatedFallback, Color.surfaceElevatedFallback],
+            startPoint: .top,
+            endPoint: .bottom
         )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Monthly reward unlocks in \(timeRemaining)")
+        return RoundedRectangle(cornerRadius: CornerRadius.card)
+            .fill(canSpin ? readyGradient : lockedGradient)
+    }
+
+    private var heroOverlay: some View {
+        let readyStroke = LinearGradient(
+            colors: [.yellow.opacity(0.5), .orange.opacity(0.5)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        let lockedStroke = LinearGradient(
+            colors: [Color.clear, Color.clear],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        return RoundedRectangle(cornerRadius: CornerRadius.card)
+            .stroke(canSpin ? readyStroke : lockedStroke, lineWidth: canSpin ? 2 : 0)
     }
 
     var ruleExplainerCard: some View {
@@ -278,28 +463,46 @@ private extension TestView {
                     title: "Impulses resisted",
                     value: "\(viewModel.itemCount)",
                     icon: "flame.fill",
-                    color: Color(red: 1.0, green: 0.3, blue: 0.3),
+                    color: .red,
                     isHighlighted: viewModel.itemCount > 0
                 )
             }
 
-            // Action buttons
-            if viewModel.itemCount > 0 {
-                if viewModel.testSummary != nil {
-                    Button {
-                        viewModel.resetTestSummary()
-                        HapticManager.shared.lightImpact()
-                    } label: {
-                        Label("Reset Draw", systemImage: "arrow.counterclockwise")
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                    }
-                    .buttonStyle(.bordered)
-                }
-            } else {
+            // Empty state
+            if viewModel.itemCount == 0 {
                 emptyMonthState
             }
+
+            // Test button (development only)
+            #if DEBUG
+            VStack(spacing: Spacing.sm) {
+                Button {
+                    viewModel.createPendingCloseoutForTest()
+                    HapticManager.shared.lightImpact()
+                } label: {
+                    Label("🧪 Create Test Closeout", systemImage: "flask")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                }
+                .buttonStyle(.bordered)
+                .tint(.orange)
+
+                if viewModel.pendingCloseout != nil {
+                    Button {
+                        viewModel.clearPendingCloseout()
+                        HapticManager.shared.lightImpact()
+                    } label: {
+                        Label("Clear Test Closeout", systemImage: "trash")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
+            }
+            #endif
         }
         .padding(Spacing.xl)
         .cardStyle()

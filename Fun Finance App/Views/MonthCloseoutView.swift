@@ -81,42 +81,104 @@ private extension MonthCloseoutView {
         VStack(spacing: Spacing.xl) {
             Spacer()
 
-            // Celebration header
+            // Celebration header with enhanced animations
             VStack(spacing: Spacing.sm) {
-                // Trophy icon with particles
+                // Trophy icon with animated particles
                 ZStack {
-                    // Glow effect
-                    Circle()
-                        .fill(Color.yellow.opacity(0.2))
-                        .frame(width: 100, height: 100)
+                    // Multiple pulsing glow rings
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(Color.yellow.opacity(0.2 - Double(index) * 0.06))
+                            .frame(width: 100 + CGFloat(index * 20), height: 100 + CGFloat(index * 20))
+                            .scaleEffect(showWinner ? 1.2 : 1.0)
+                            .opacity(showWinner ? 0.0 : 1.0)
+                            .animation(
+                                .easeOut(duration: 1.0)
+                                .delay(Double(index) * 0.1),
+                                value: showWinner
+                            )
+                    }
 
+                    // Rotating stars/sparkles
+                    ForEach(0..<8) { index in
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.yellow, .orange],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .offset(
+                                x: cos(Double(index) * .pi / 4) * 70,
+                                y: sin(Double(index) * .pi / 4) * 70
+                            )
+                            .scaleEffect(showWinner ? 1.0 : 0.0)
+                            .opacity(showWinner ? 1.0 : 0.0)
+                            .animation(
+                                .spring(response: 0.6, dampingFraction: 0.5)
+                                .delay(0.2 + Double(index) * 0.05),
+                                value: showWinner
+                            )
+                    }
+
+                    // Trophy icon
                     Image(systemName: "trophy.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.yellow)
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.yellow, .orange],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .shadow(color: .yellow.opacity(0.6), radius: 12, x: 0, y: 4)
+                        .scaleEffect(showWinner ? 1.0 : 0.5)
+                        .rotationEffect(.degrees(showWinner ? 0 : -180))
+                        .animation(.spring(response: 0.8, dampingFraction: 0.6), value: showWinner)
                 }
+                .frame(height: 150)
 
-                Text("🎉 Congratulations!")
+                Text("🎉 Congratulations! 🎉")
                     .font(.system(.title, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundColor(Color.primaryFallback)
+                    .fontWeight(.black)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .yellow, .orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .scaleEffect(showWinner ? 1.0 : 0.8)
+                    .opacity(showWinner ? 1.0 : 0.0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3), value: showWinner)
             }
 
-            // Winner card
+            // Winner card with bounce animation
             VStack(spacing: Spacing.md) {
                 ItemCardView(item: item, image: imageProvider(item))
                     .frame(maxWidth: 320)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.yellow, lineWidth: 3)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.yellow, .orange, .yellow],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 4
+                            )
                     )
+                    .shadow(color: .yellow.opacity(0.5), radius: 16, x: 0, y: 8)
 
                 if !item.tags.isEmpty {
                     TagListView(tags: item.tags)
                 }
             }
-            .scaleEffect(showWinner ? 1.0 : 0.8)
+            .scaleEffect(showWinner ? 1.0 : 0.5)
             .opacity(showWinner ? 1.0 : 0.0)
-            .animation(.spring(response: 0.6, dampingFraction: 0.7), value: showWinner)
+            .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.4), value: showWinner)
 
             // KPI Stats
             // Items that were skipped (not selected as winner)
@@ -124,14 +186,7 @@ private extension MonthCloseoutView {
             let skippedCount = skippedItems.count
             let totalSaved = skippedItems.reduce(Decimal.zero) { $0 + $1.priceWithTax }
 
-            // Total items in the month
-            let totalItemsLogged = viewModel.items.count
-
-            // Savings rate: percentage of items not purchased (skipped + notPurchased)
-            let itemsNotPurchased = viewModel.items.filter { $0.status == .skipped || $0.status == .notPurchased }
-            let savingsRate = totalItemsLogged > 0 ? (Double(itemsNotPurchased.count) / Double(totalItemsLogged)) * 100 : 0
-
-            HStack(spacing: Spacing.md) {
+            HStack(spacing: Spacing.lg) {
                 // Money Saved
                 WinnerKPI(
                     icon: "dollarsign.circle.fill",
@@ -139,6 +194,9 @@ private extension MonthCloseoutView {
                     label: "Total Saved",
                     color: Color.successFallback
                 )
+                .scaleEffect(showWinner ? 1.0 : 0.5)
+                .opacity(showWinner ? 1.0 : 0.0)
+                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.6), value: showWinner)
 
                 // Temptations Resisted
                 WinnerKPI(
@@ -147,16 +205,11 @@ private extension MonthCloseoutView {
                     label: skippedCount == 1 ? "Temptation Resisted" : "Temptations Resisted",
                     color: Color.orange
                 )
-
-                // Savings Rate
-                WinnerKPI(
-                    icon: "chart.line.uptrend.xyaxis",
-                    value: String(format: "%.0f%%", savingsRate),
-                    label: "Savings Rate",
-                    color: Color.blue
-                )
+                .scaleEffect(showWinner ? 1.0 : 0.5)
+                .opacity(showWinner ? 1.0 : 0.0)
+                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.7), value: showWinner)
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Spacing.lg)
 
             Spacer()
         }
@@ -178,29 +231,57 @@ private extension MonthCloseoutView {
         scrollOffset = 0
         HapticManager.shared.heavyImpact()
 
-        // Calculate target offset to center winner
+        // Calculate offsets
         let cardWidth: CGFloat = 200
         let spacing: CGFloat = 20
         let cardPlusSpacing = cardWidth + spacing
-
-        // We repeat items 3 times, so use middle repetition (index 1)
-        let targetRepetition = 1
-        let totalCardsBeforeTarget = (targetRepetition * candidates.count) + winnerIndex
         let centerScreen = UIScreen.main.bounds.width / 2
-        let finalOffset = centerScreen - (CGFloat(totalCardsBeforeTarget) * cardPlusSpacing) - (cardWidth / 2)
 
-        // Single phase: Quick spin to winner (1 second)
-        withAnimation(.easeOut(duration: 1.0)) {
-            scrollOffset = finalOffset
+        // Phase 1: Fast initial spin (1.5 seconds)
+        let phase1Offset = -CGFloat(candidates.count * 2) * cardPlusSpacing
+        withAnimation(.easeIn(duration: 1.5)) {
+            scrollOffset = phase1Offset
         }
 
-        // Show winner after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        // Phase 2: Medium speed spin (1.5 seconds)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            HapticManager.shared.mediumImpact()
+            let phase2Offset = phase1Offset - (CGFloat(candidates.count) * cardPlusSpacing)
+            withAnimation(.linear(duration: 1.5)) {
+                self.scrollOffset = phase2Offset
+            }
+        }
+
+        // Phase 3: Slow down to winner (2 seconds)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            HapticManager.shared.mediumImpact()
+            let targetRepetition = 1
+            let totalCardsBeforeTarget = (targetRepetition * candidates.count) + winnerIndex
+            let finalOffset = centerScreen - (CGFloat(totalCardsBeforeTarget) * cardPlusSpacing) - (cardWidth / 2)
+
+            withAnimation(.easeOut(duration: 2.0)) {
+                self.scrollOffset = finalOffset
+            }
+        }
+
+        // Show winner with celebration (after 5 seconds total)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
             self.isSpinning = false
             self.viewModel.setWinner(winnerCandidate)
-            HapticManager.shared.success()
 
-            withAnimation {
+            // Multiple haptic bursts for celebration
+            HapticManager.shared.success()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                HapticManager.shared.lightImpact()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                HapticManager.shared.lightImpact()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                HapticManager.shared.success()
+            }
+
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
                 self.showWinner = true
             }
         }
@@ -241,11 +322,13 @@ private struct WinnerKPI: View {
                 .fontWeight(.medium)
                 .foregroundColor(Color.secondaryFallback)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.lg)
-        .padding(.horizontal, Spacing.xs)
+        .padding(.vertical, Spacing.md)
+        .padding(.horizontal, Spacing.sm)
         .background(
             RoundedRectangle(cornerRadius: CornerRadius.listRow)
                 .fill(Color.surfaceElevatedFallback)

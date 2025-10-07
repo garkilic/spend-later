@@ -3,16 +3,12 @@ import PhotosUI
 
 struct AddItemSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel: AddItemViewModel
+    @ObservedObject var viewModel: AddItemViewModel
 
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var showingCamera = false
     @State private var showingPhotoSource = false
     @State private var cameraError: String?
-
-    init(viewModel: AddItemViewModel) {
-        _viewModel = StateObject(wrappedValue: viewModel)
-    }
 
     var body: some View {
         NavigationStack {
@@ -207,7 +203,8 @@ struct AddItemSheet: View {
                 .background(color.opacity(0.18))
                 .clipShape(Circle())
                 .alignmentGuide(.firstTextBaseline) { dimensions in
-                    dimensions[VerticalAlignment.center]
+                    // For multiline fields, align icon to top instead of center
+                    dimensions[.top] + 16 // Half of icon height (32/2) for optical alignment
                 }
 
             field
