@@ -472,37 +472,6 @@ private extension TestView {
             if viewModel.itemCount == 0 {
                 emptyMonthState
             }
-
-            // Test button (development only)
-            #if DEBUG
-            VStack(spacing: Spacing.sm) {
-                Button {
-                    viewModel.createPendingCloseoutForTest()
-                    HapticManager.shared.lightImpact()
-                } label: {
-                    Label("🧪 Create Test Closeout", systemImage: "flask")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                }
-                .buttonStyle(.bordered)
-                .tint(.orange)
-
-                if viewModel.pendingCloseout != nil {
-                    Button {
-                        viewModel.clearPendingCloseout()
-                        HapticManager.shared.lightImpact()
-                    } label: {
-                        Label("Clear Test Closeout", systemImage: "trash")
-                            .font(.caption)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                }
-            }
-            #endif
         }
         .padding(Spacing.xl)
         .cardStyle()
