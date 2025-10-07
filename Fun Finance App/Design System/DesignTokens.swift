@@ -2,15 +2,33 @@ import SwiftUI
 
 // MARK: - Color Tokens
 extension Color {
-    // Semantic colors with light/dark mode support
-    static let appPrimary = Color(light: .black, dark: .white)
-    static let appSecondary = Color(light: Color(white: 0.4), dark: Color(white: 0.6))
-    static let appSuccess = Color(light: Color(red: 0.0, green: 0.6, blue: 0.35), dark: Color(red: 0.2, green: 0.8, blue: 0.5))
-    static let appWarning = Color(light: Color(red: 1.0, green: 0.6, blue: 0.0), dark: Color(red: 1.0, green: 0.7, blue: 0.2))
-    static let appSurface = Color(light: .white, dark: Color(white: 0.1))
-    static let appSurfaceElevated = Color(light: Color(white: 0.98), dark: Color(white: 0.15))
-    static let appSeparator = Color(light: Color(white: 0.85), dark: Color(white: 0.3))
-    static let appAccent = Color(red: 0.02, green: 0.65, blue: 0.41)
+    // Semantic colors with light/dark mode support using UIColor for reliability
+    static let appPrimary = Color(uiColor: .label)
+    static let appSecondary = Color(uiColor: .secondaryLabel)
+    static let appSuccess = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.2, green: 0.8, blue: 0.5, alpha: 1.0)
+            : UIColor(red: 0.0, green: 0.6, blue: 0.35, alpha: 1.0)
+    })
+    static let appWarning = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1.0, green: 0.7, blue: 0.2, alpha: 1.0)
+            : UIColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 1.0)
+    })
+    static let appSurface = Color(uiColor: .systemBackground)
+    static let appSurfaceElevated = Color(uiColor: .secondarySystemBackground)
+    static let appSeparator = Color(uiColor: .separator)
+    static let appAccent = Color(uiColor: UIColor { traits in
+        UIColor.appAccentColor(for: traits)
+    })
+    static let appAccentSurface = Color(uiColor: UIColor { traits in
+        let accent = UIColor.appAccentColor(for: traits)
+        let alpha: CGFloat = traits.userInterfaceStyle == .dark ? 0.24 : 0.14
+        return accent.withAlphaComponent(alpha)
+    })
+    static let appOnAccent = Color(uiColor: UIColor { _ in
+        UIColor.white
+    })
 
     // Legacy fallback names for compatibility
     static let primaryFallback = appPrimary
@@ -21,12 +39,8 @@ extension Color {
     static let surfaceElevatedFallback = appSurfaceElevated
     static let separatorFallback = appSeparator
     static let accentFallback = appAccent
-
-    init(light: Color, dark: Color) {
-        self.init(uiColor: UIColor(dynamicProvider: { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
-        }))
-    }
+    static let onAccentFallback = appOnAccent
+    static let accentSurfaceFallback = appAccentSurface
 }
 
 // MARK: - Typography
@@ -120,12 +134,7 @@ struct CardStyle: ViewModifier {
             .cornerRadius(CornerRadius.card)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.card)
-                    .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : Color.clear, lineWidth: 1)
-            )
-            .shadow(
-                color: colorScheme == .light ? Color.black.opacity(ShadowStyle.elevation1.opacity) : .clear,
-                radius: ShadowStyle.elevation1.radius,
-                y: ShadowStyle.elevation1.y
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06), lineWidth: 1)
             )
     }
 }
@@ -151,5 +160,16 @@ struct SectionHeaderStyle: ViewModifier {
 extension View {
     func sectionHeaderStyle() -> some View {
         modifier(SectionHeaderStyle())
+    }
+}
+
+// MARK: - Internal helpers
+private extension UIColor {
+    static func appAccentColor(for traits: UITraitCollection) -> UIColor {
+        if traits.userInterfaceStyle == .dark {
+            return UIColor(red: 0.18, green: 0.82, blue: 0.58, alpha: 1.0)
+        } else {
+            return UIColor(red: 0.02, green: 0.65, blue: 0.41, alpha: 1.0)
+        }
     }
 }

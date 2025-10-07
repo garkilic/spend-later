@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DashboardView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel: DashboardViewModel
     @StateObject private var addItemViewModel: AddItemViewModel
     @State private var showingAddSheet = false
@@ -61,6 +62,10 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingGraph) {
                 graphSheet
+                    .onAppear {
+                        // Lazy load yearly data when graph is opened
+                        viewModel.loadYearlyData()
+                    }
             }
             .alert("Delete Item?", isPresented: $showingDeleteConfirmation, presenting: itemToDelete) { item in
                 Button("Delete", role: .destructive) {
@@ -77,10 +82,7 @@ struct DashboardView: View {
             }
             .onChange(of: showingAddSheet) { _, isPresented in
                 if !isPresented {
-                    // Refresh on next run loop to ensure Core Data changes are merged
-                    Task { @MainActor in
-                        viewModel.refresh()
-                    }
+                    viewModel.refresh()
                 }
             }
             .onAppear { viewModel.refresh() }
@@ -90,16 +92,7 @@ struct DashboardView: View {
 
 private extension DashboardView {
     var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color.surfaceFallback,
-                Color.surfaceElevatedFallback
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .opacity(0.06)
-        .background(Color.surfaceFallback)
+        Color.surfaceFallback
     }
 
     var savingsHero: some View {
@@ -127,7 +120,6 @@ private extension DashboardView {
                 .foregroundColor(.white)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
-                .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
 
             // Subtitle
             Text("Saved this month")
@@ -136,22 +128,8 @@ private extension DashboardView {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Spacing.xl)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.successFallback,
-                    Color.successFallback.opacity(0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(Color.successFallback)
         .cornerRadius(CornerRadius.card)
-        .shadow(
-            color: Color.successFallback.opacity(0.3),
-            radius: 16,
-            y: 8
-        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Willpower wins, saved this month: \(CurrencyFormatter.string(from: viewModel.totalSaved))")
     }
@@ -279,7 +257,7 @@ private extension DashboardView {
                 .font(.title3)
                 .foregroundColor(Color.accentFallback)
                 .frame(width: 32, height: 32)
-                .background(Color.accentFallback.opacity(0.1))
+                .background(Color.accentSurfaceFallback)
                 .clipShape(Circle())
 
             // Content
@@ -325,13 +303,8 @@ private extension DashboardView {
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background(Color.accentFallback)
-            .foregroundColor(.white)
+            .foregroundColor(Color.onAccentFallback)
             .cornerRadius(CornerRadius.button)
-            .shadow(
-                color: Color.black.opacity(0.15),
-                radius: 12,
-                y: 4
-            )
         }
         .padding(.horizontal, Spacing.sideGutter)
         .padding(.bottom, Spacing.md)

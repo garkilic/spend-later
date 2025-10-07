@@ -36,6 +36,8 @@ final class MonthRepository: MonthRepositoryProtocol {
     func summaries() throws -> [MonthSummaryEntity] {
         let request = NSFetchRequest<MonthSummaryEntity>(entityName: "MonthSummary")
         request.sortDescriptors = [NSSortDescriptor(key: "monthKey", ascending: false)]
+        request.fetchBatchSize = 20
+        request.returnsObjectsAsFaults = false
         return try context.fetch(request)
     }
 

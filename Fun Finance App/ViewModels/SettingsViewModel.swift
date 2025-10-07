@@ -3,7 +3,6 @@ import Foundation
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var weeklyReminderEnabled: Bool = true
     @Published var passcodeEnabled: Bool = false
     @Published var errorMessage: String?
     @Published var taxRatePercent: Decimal = .zero {
@@ -11,41 +10,26 @@ final class SettingsViewModel: ObservableObject {
     }
 
     private let settingsRepository: SettingsRepositoryProtocol
-    private let notificationScheduler: NotificationScheduling
     private let passcodeManager: PasscodeManager
     private var hasLoaded = false
     private var lastPersistedTaxRate: Decimal = .zero
 
     init(settingsRepository: SettingsRepositoryProtocol,
-         notificationScheduler: NotificationScheduling,
          passcodeManager: PasscodeManager) {
         self.settingsRepository = settingsRepository
-        self.notificationScheduler = notificationScheduler
         self.passcodeManager = passcodeManager
     }
 
     func load() {
         do {
             let settings = try settingsRepository.loadAppSettings()
-            weeklyReminderEnabled = settings.weeklyReminderEnabled
             passcodeEnabled = settings.passcodeEnabled
             passcodeManager.setActiveKey(settings.passcodeKeychainKey)
             taxRatePercent = settings.taxRate.decimalValue * 100
             lastPersistedTaxRate = taxRatePercent
-            notificationScheduler.cancelMonthlyReminder()
             hasLoaded = true
         } catch {
             errorMessage = "Unable to load settings."
-        }
-    }
-
-    func toggleWeeklyReminder(_ enabled: Bool) {
-        weeklyReminderEnabled = enabled
-        notificationScheduler.updateWeeklyReminder(enabled: enabled)
-        do {
-            try settingsRepository.updateReminderPrefs(weekly: weeklyReminderEnabled, monthly: false)
-        } catch {
-            errorMessage = "Could not save reminder preference."
         }
     }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct AppRootView: View {
     enum Tab: Hashable {
@@ -44,13 +45,16 @@ struct AppRootView: View {
                                                                    settingsRepository: container.settingsRepository,
                                                                    imageStore: container.imageStore,
                                                                    haptics: container.hapticManager))
-        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(settingsRepository: container.settingsRepository, notificationScheduler: container.notificationScheduler, passcodeManager: container.passcodeManager))
+        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(settingsRepository: container.settingsRepository, passcodeManager: container.passcodeManager))
         _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(passcodeManager: container.passcodeManager, settingsRepository: container.settingsRepository))
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            DashboardView(viewModel: dashboardViewModel,
+        ZStack {
+            Color.surfaceFallback.ignoresSafeArea()
+
+            TabView(selection: $selectedTab) {
+                DashboardView(viewModel: dashboardViewModel,
                           addItemViewModel: addItemViewModel,
                           onOpenSettings: { showingSettings = true },
                           makeDetailViewModel: { item in
@@ -82,7 +86,7 @@ struct AppRootView: View {
             }
                 .tabItem { Label("Reward", systemImage: "gift.fill") }
                 .tag(Tab.reward)
-
+            }
         }
         .onChange(of: selectedTab) { _, newValue in
             if newValue == .add {
@@ -92,6 +96,16 @@ struct AppRootView: View {
                 }
             } else {
                 lastNonAddTab = newValue
+
+                // Lazy load tab data when first accessed
+                switch newValue {
+                case .history:
+                    historyViewModel.refresh()
+                case .reward:
+                    rewardViewModel.refresh()
+                default:
+                    break
+                }
             }
         }
         .sheet(item: $closeoutSummary) { summary in
@@ -110,12 +124,6 @@ struct AppRootView: View {
         .sheet(isPresented: $showingAddSheet) {
             AddItemSheet(viewModel: addItemViewModel)
         }
-        .onChange(of: showingAddSheet) { _, isPresented in
-            if !isPresented {
-                // Refresh history when add sheet is dismissed
-                historyViewModel.refresh()
-            }
-        }
         .sheet(isPresented: $showingOnboarding) {
             OnboardingView {
                 hasCompletedOnboarding = true
@@ -126,39 +134,56 @@ struct AppRootView: View {
                 isLocked = false
             }
         }
-        .onAppear {
-            dashboardViewModel.refresh()
-            historyViewModel.refresh()
-            rewardViewModel.refresh()
-            settingsViewModel.load()
-
-            // Delay onboarding check to ensure it appears on top of everything
+        .task {
+            // Check onboarding immediately
             if !hasCheckedOnboarding {
                 hasCheckedOnboarding = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if !hasCompletedOnboarding {
-                        showingOnboarding = true
-                    }
+                if !hasCompletedOnboarding {
+                    showingOnboarding = true
+                    return
                 }
             }
 
-            Task { await checkRollover() }
-            Task { await refreshLockState() }
+            // Load in background - UI shows immediately
+            await refreshLockState()
+
+            // Only load dashboard if not locked
+            if hasCompletedOnboarding && !isLocked {
+                dashboardViewModel.refresh()
+            }
+
+            // Check rollover
+            await checkRollover()
+
+            // Preload PhotoPicker framework in background (for Record Impulse)
+            Task.detached(priority: .background) {
+                _ = await PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            }
         }
         .onChange(of: scenePhase) { _, newValue in
-            if newValue == .active {
-                // Always return to dashboard when app becomes active
-                selectedTab = .dashboard
-                Task {
-                    await checkRollover()
-                    await refreshLockState()
+            guard newValue == .active else { return }
+
+            // Return to dashboard when app becomes active
+            selectedTab = .dashboard
+
+            Task.detached(priority: .userInitiated) { @MainActor in
+                await self.refreshLockState()
+
+                // Only refresh dashboard if not locked
+                if !self.isLocked {
+                    self.dashboardViewModel.refresh()
                 }
+
+                await self.checkRollover()
             }
         }
         .onChange(of: isLocked) { _, newValue in
             // Return to dashboard after unlocking
             if !newValue {
                 selectedTab = .dashboard
+
+                // Only refresh dashboard after unlocking
+                dashboardViewModel.refresh()
             }
         }
     }

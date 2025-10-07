@@ -18,7 +18,7 @@ struct YearlySummaryView: View {
                         x: .value("Month", point.date),
                         y: .value("Total", point.total)
                     )
-                    .foregroundStyle(LinearGradient(colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.05)], startPoint: .top, endPoint: .bottom))
+                    .foregroundStyle(Color.accentColor.opacity(0.2))
                     PointMark(
                         x: .value("Month", point.date),
                         y: .value("Total", point.total)
@@ -51,7 +51,6 @@ struct YearlySummaryView: View {
                    Button("Done") { dismiss() }
                }
            }
-            .onAppear { viewModel.refresh() }
         }
     }
 }

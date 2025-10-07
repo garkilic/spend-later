@@ -7,8 +7,6 @@ struct TestView: View {
     @State private var timeRemaining: String = ""
     @State private var daysRemaining: Int = 0
     @State private var canSpin: Bool = false
-    @State private var timerCancellable: AnyCancellable?
-    @Environment(\.scenePhase) private var scenePhase
     let imageProvider: (WantedItemDisplay) -> UIImage?
 
     init(viewModel: TestViewModel, imageProvider: @escaping (WantedItemDisplay) -> UIImage?) {
@@ -47,39 +45,8 @@ struct TestView: View {
             .onAppear {
                 viewModel.refresh()
                 updateCountdown()
-                startTimer()
-            }
-            .onDisappear {
-                stopTimer()
-            }
-            .onChange(of: scenePhase) { newPhase in
-                switch newPhase {
-                case .active:
-                    updateCountdown()
-                    startTimer()
-                case .inactive, .background:
-                    stopTimer()
-                @unknown default:
-                    break
-                }
             }
         }
-    }
-
-    private func startTimer() {
-        // Only update every second if less than 1 hour remaining, otherwise update every minute
-        let interval: TimeInterval = daysRemaining == 0 && canSpin == false ? 1.0 : 60.0
-
-        timerCancellable = Timer.publish(every: interval, on: .main, in: .common)
-            .autoconnect()
-            .sink { _ in
-                updateCountdown()
-            }
-    }
-
-    private func stopTimer() {
-        timerCancellable?.cancel()
-        timerCancellable = nil
     }
 
     private func updateCountdown() {
@@ -92,7 +59,6 @@ struct TestView: View {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
-            stopTimer()
             return
         }
 
@@ -102,14 +68,10 @@ struct TestView: View {
         // Calculate time remaining
         let components = calendar.dateComponents([.day, .hour, .minute, .second], from: now, to: unlockTime)
 
-        guard let days = components.day,
-              let hours = components.hour,
-              let minutes = components.minute,
-              let seconds = components.second else {
+        guard let days = components.day else {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
-            stopTimer()
             return
         }
 
@@ -118,7 +80,6 @@ struct TestView: View {
             timeRemaining = "Ready!"
             daysRemaining = 0
             canSpin = true
-            stopTimer()
         } else if days > 1 {
             timeRemaining = "\(days) days"
             daysRemaining = days
@@ -127,19 +88,10 @@ struct TestView: View {
             timeRemaining = "\(days) day"
             daysRemaining = days
             canSpin = false
-        } else if hours > 0 {
-            timeRemaining = "\(hours)h \(minutes)m"
-            daysRemaining = 0
-            canSpin = false
-        } else if minutes > 0 {
-            timeRemaining = "\(minutes)m \(seconds)s"
-            daysRemaining = 0
-            canSpin = false
         } else {
-            timeRemaining = "Ready!"
+            timeRemaining = "< 1 day"
             daysRemaining = 0
-            canSpin = true
-            stopTimer()
+            canSpin = false
         }
     }
 }
@@ -162,42 +114,20 @@ private extension TestView {
         VStack(spacing: Spacing.lg) {
             // Gift icon with pulsing effect
             ZStack {
-                // Outer pulsing ring
+                // Outer ring
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.orange.opacity(0.15), Color.red.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.orange.opacity(0.15))
                     .frame(width: 140, height: 140)
-                    .scaleEffect(canSpin ? 1.1 : 1.0)
-                    .opacity(canSpin ? 0.5 : 0.8)
-                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: canSpin)
 
                 // Middle ring
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.orange.opacity(0.25), Color.red.opacity(0.15)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.orange.opacity(0.25))
                     .frame(width: 100, height: 100)
 
                 // Gift icon
                 Image(systemName: canSpin ? "gift.fill" : "lock.fill")
                     .font(.system(size: 48))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: canSpin ? [.yellow, .orange] : [.orange, .red],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .shadow(color: canSpin ? .yellow.opacity(0.5) : .clear, radius: 20)
+                    .foregroundColor(canSpin ? .yellow : .orange)
             }
             .frame(maxWidth: .infinity)
 
@@ -211,16 +141,9 @@ private extension TestView {
                 Text(timeRemaining)
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: canSpin ? [Color.successFallback, Color.successFallback.opacity(0.8)] : [Color.primaryFallback, Color.primaryFallback.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundColor(canSpin ? Color.successFallback : Color.primaryFallback)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .shadow(color: canSpin ? Color.successFallback.opacity(0.2) : .clear, radius: 8)
             }
 
             // Spin button integrated in hero card
@@ -247,26 +170,13 @@ private extension TestView {
                 .buttonStyle(.borderedProminent)
                 .tint(canSpin ? Color.successFallback : Color.gray)
                 .disabled(!canSpin)
-                .shadow(
-                    color: canSpin ? Color.successFallback.opacity(0.3) : Color.clear,
-                    radius: 8,
-                    y: 4
-                )
             }
         }
         .padding(Spacing.xl)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: CornerRadius.card)
-                .fill(
-                    LinearGradient(
-                        colors: canSpin ?
-                            [Color.successFallback.opacity(0.08), Color.successFallback.opacity(0.04)] :
-                            [Color.surfaceElevatedFallback, Color.surfaceElevatedFallback.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(canSpin ? Color.successFallback.opacity(0.06) : Color.surfaceElevatedFallback)
         )
         .overlay(
             RoundedRectangle(cornerRadius: CornerRadius.card)
@@ -274,11 +184,6 @@ private extension TestView {
                     canSpin ? Color.successFallback.opacity(0.3) : Color.clear,
                     lineWidth: 2
                 )
-        )
-        .shadow(
-            color: canSpin ? Color.successFallback.opacity(0.2) : Color.black.opacity(0.04),
-            radius: canSpin ? 16 : 8,
-            y: 4
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Monthly reward unlocks in \(timeRemaining)")
@@ -480,16 +385,7 @@ private struct HowItWorksRow: View {
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .frame(width: 24, height: 24)
-                .background(
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.accentFallback, Color.accentFallback.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                )
+                .background(Circle().fill(Color.accentFallback))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

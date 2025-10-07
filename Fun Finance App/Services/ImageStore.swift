@@ -10,12 +10,17 @@ final class ImageStore: ImageStoring {
     private let fileManager: FileManager
     private let directoryURL: URL
     private let targetSizeInBytes = 500_000
+    private var imageCache = NSCache<NSString, UIImage>()
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         directoryURL = appSupport.appendingPathComponent("Images", isDirectory: true)
         createDirectoryIfNeeded()
+
+        // Configure cache - smaller limits for device
+        imageCache.countLimit = 20 // Reduced from 50
+        imageCache.totalCostLimit = 20 * 1024 * 1024 // 20MB instead of 50MB
     }
 
     func save(image: UIImage) throws -> String {
@@ -28,13 +33,31 @@ final class ImageStore: ImageStoring {
 
     func loadImage(named filename: String) -> UIImage? {
         guard !filename.isEmpty else { return nil }
+
+        // Check cache first
+        let key = filename as NSString
+        if let cachedImage = imageCache.object(forKey: key) {
+            return cachedImage
+        }
+
+        // Load from disk
         let url = directoryURL.appendingPathComponent(filename)
         guard fileManager.fileExists(atPath: url.path) else { return nil }
-        return UIImage(contentsOfFile: url.path)
+        guard let image = UIImage(contentsOfFile: url.path) else { return nil }
+
+        // Cache for future use
+        imageCache.setObject(image, forKey: key)
+        return image
     }
 
     func deleteImage(named filename: String) {
         guard !filename.isEmpty else { return }
+
+        // Remove from cache
+        let key = filename as NSString
+        imageCache.removeObject(forKey: key)
+
+        // Remove from disk
         let url = directoryURL.appendingPathComponent(filename)
         try? fileManager.removeItem(at: url)
     }

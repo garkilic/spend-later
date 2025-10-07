@@ -61,17 +61,17 @@ private extension MonthCloseoutView {
 
         return GeometryReader { geometry in
             HStack(spacing: spacing) {
-                // Repeat items multiple times for continuous effect
-                ForEach(0..<5) { _ in
+                // Repeat items 3 times (reduced from 5)
+                ForEach(0..<3) { _ in
                     ForEach(activeItems) { item in
                         ItemCardView(item: item, image: imageProvider(item))
                             .frame(width: cardWidth)
-                            .blur(radius: 10)
+                            .opacity(0.6)
                     }
                 }
             }
             .offset(x: scrollOffset)
-            .frame(width: totalWidth * 5, alignment: .leading)
+            .frame(width: totalWidth * 3, alignment: .leading)
         }
         .frame(height: 250)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -87,26 +87,12 @@ private extension MonthCloseoutView {
                 ZStack {
                     // Glow effect
                     Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [.yellow.opacity(0.4), .clear],
-                                center: .center,
-                                startRadius: 15,
-                                endRadius: 50
-                            )
-                        )
+                        .fill(Color.yellow.opacity(0.2))
                         .frame(width: 100, height: 100)
 
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 40))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.yellow, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .shadow(color: .yellow.opacity(0.6), radius: 15)
+                        .foregroundColor(.yellow)
                 }
 
                 Text("🎉 Congratulations!")
@@ -121,16 +107,8 @@ private extension MonthCloseoutView {
                     .frame(maxWidth: 320)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.yellow, .orange, .yellow],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 3
-                            )
+                            .stroke(Color.yellow, lineWidth: 3)
                     )
-                    .shadow(color: .yellow.opacity(0.5), radius: 24, y: 12)
 
                 if !item.tags.isEmpty {
                     TagListView(tags: item.tags)
@@ -205,38 +183,25 @@ private extension MonthCloseoutView {
         let spacing: CGFloat = 20
         let cardPlusSpacing = cardWidth + spacing
 
-        // We repeat items 5 times, so use middle repetition (index 2)
-        let targetRepetition = 2
+        // We repeat items 3 times, so use middle repetition (index 1)
+        let targetRepetition = 1
         let totalCardsBeforeTarget = (targetRepetition * candidates.count) + winnerIndex
         let centerScreen = UIScreen.main.bounds.width / 2
         let finalOffset = centerScreen - (CGFloat(totalCardsBeforeTarget) * cardPlusSpacing) - (cardWidth / 2)
 
-        // Fast spin: move through many cards quickly
-        let spinDistance: CGFloat = -3000
-
-        // Phase 1: Fast spin (0.8 seconds)
-        withAnimation(.linear(duration: 0.8)) {
-            scrollOffset = spinDistance
+        // Single phase: Quick spin to winner (1 second)
+        withAnimation(.easeOut(duration: 1.0)) {
+            scrollOffset = finalOffset
         }
 
-        // Phase 2: Slow down and land on winner (1.5 seconds with easeOut)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.easeOut(duration: 1.5)) {
-                self.scrollOffset = finalOffset
-            }
+        // Show winner after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.isSpinning = false
+            self.viewModel.setWinner(winnerCandidate)
+            HapticManager.shared.success()
 
-            // Haptic feedback during slowdown
-            HapticManager.shared.lightImpact()
-
-            // Final celebration - show winner
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                self.isSpinning = false
-                self.viewModel.setWinner(winnerCandidate)
-                HapticManager.shared.success()
-
-                withAnimation {
-                    self.showWinner = true
-                }
+            withAnimation {
+                self.showWinner = true
             }
         }
     }

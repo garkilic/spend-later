@@ -35,7 +35,7 @@ final class DashboardViewModel: ObservableObject {
         self.calendar = calendar
     }
 
-    func refresh() {
+    func refresh(includeYearlyData: Bool = false) {
         do {
             errorMessage = nil
             try reloadTaxRate()
@@ -43,10 +43,22 @@ final class DashboardViewModel: ObservableObject {
             let displays = makeDisplays(from: items)
             apply(displays: displays)
             updateReviewAvailability()
-            try updateYearlyTotals(currentMonthDisplays: displays)
+
+            // Only load yearly totals when needed (e.g., when viewing graph)
+            if includeYearlyData {
+                try updateYearlyTotals(currentMonthDisplays: displays)
+            }
         } catch {
             errorMessage = "Failed to load items. Please try again."
             assertionFailure("Failed to fetch items: \(error)")
+        }
+    }
+
+    func loadYearlyData() {
+        do {
+            try updateYearlyTotals(currentMonthDisplays: items)
+        } catch {
+            assertionFailure("Failed to load yearly data: \(error)")
         }
     }
 

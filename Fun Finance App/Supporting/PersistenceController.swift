@@ -8,11 +8,15 @@ final class PersistenceController {
         return controller
     }()
 
+    // Cache the model to avoid rebuilding on every init
+    private static let cachedModel: NSManagedObjectModel = {
+        return makeModel(for: ModelVersion.current)
+    }()
+
     let container: NSPersistentContainer
 
     init(inMemory: Bool = false) {
-        let model = PersistenceController.makeModel(for: ModelVersion.current)
-        container = NSPersistentContainer(name: "SpendLaterModel", managedObjectModel: model)
+        container = NSPersistentContainer(name: "SpendLaterModel", managedObjectModel: Self.cachedModel)
 
         if inMemory {
             let description = NSPersistentStoreDescription()
@@ -31,21 +35,46 @@ final class PersistenceController {
             }
 
             let description = NSPersistentStoreDescription(url: storeURL)
-            description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-            description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+            // One-time migration: Remove persistent history tracking to fix read-only mode
+            let migrationKey = "didMigratePersistentHistory_v1"
+            let needsMigration = !UserDefaults.standard.bool(forKey: migrationKey) &&
+                                 FileManager.default.fileExists(atPath: storeURL.path)
+
+            if needsMigration {
+                print("CoreData: Migrating store to remove persistent history tracking...")
+                // Remove old store files to start fresh
+                try? FileManager.default.removeItem(at: storeURL)
+                try? FileManager.default.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-shm"))
+                try? FileManager.default.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-wal"))
+                UserDefaults.standard.set(true, forKey: migrationKey)
+            }
+
+            // Disable persistent history tracking for better performance (single-device app)
+            description.setOption(false as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             description.shouldMigrateStoreAutomatically = true
             description.shouldInferMappingModelAutomatically = true
             container.persistentStoreDescriptions = [description]
         }
 
-        container.loadPersistentStores { _, error in
+        // Load store (blocking but necessary for Core Data initialization)
+        var loadError: Error?
+        container.loadPersistentStores { description, error in
             if let error {
-                fatalError("Unresolved Core Data error: \(error)")
+                loadError = error
             }
         }
 
+        if let loadError {
+            fatalError("Core Data failed to load: \(loadError.localizedDescription)")
+        }
+
+        // Optimize view context for performance - especially on device
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.automaticallyMergesChangesFromParent = false // Reduce overhead
+        container.viewContext.undoManager = nil
+        container.viewContext.shouldDeleteInaccessibleFaults = true
+        container.viewContext.stalenessInterval = -1 // No automatic refreshing
     }
 }
 

@@ -73,6 +73,8 @@ final class ItemRepository: ItemRepositoryProtocol {
 
     func items(for monthKey: String) throws -> [WantedItemEntity] {
         let request = WantedItemEntity.fetchRequest(forMonthKey: monthKey)
+        request.fetchBatchSize = 10 // Smaller batches for device
+        request.returnsObjectsAsFaults = true // Let Core Data lazy load
         return try context.fetch(request)
     }
 
@@ -82,12 +84,16 @@ final class ItemRepository: ItemRepositoryProtocol {
             NSPredicate(format: "monthKey == %@", monthKey),
             NSPredicate(format: "statusRaw == %@", ItemStatus.active.rawValue)
         ])
+        request.fetchBatchSize = 10
+        request.returnsObjectsAsFaults = true
         return try context.fetch(request)
     }
 
     func allItems() throws -> [WantedItemEntity] {
         let request = NSFetchRequest<WantedItemEntity>(entityName: "WantedItem")
         request.sortDescriptors = [NSSortDescriptor(keyPath: \WantedItemEntity.createdAt, ascending: false)]
+        request.fetchBatchSize = 20 // Reduced from 50
+        request.returnsObjectsAsFaults = true
         return try context.fetch(request)
     }
 

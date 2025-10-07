@@ -1,10 +1,11 @@
 import SwiftUI
+import PhotosUI
 
 struct PhotoSourcePickerView: View {
     @Environment(\.dismiss) private var dismiss
     let hasExistingPhoto: Bool
+    @Binding var photoPickerItem: PhotosPickerItem?
     let onSelectCamera: () -> Void
-    let onSelectLibrary: () -> Void
     let onRemovePhoto: (() -> Void)?
 
     var body: some View {
@@ -28,10 +29,11 @@ struct PhotoSourcePickerView: View {
                         }
                     }
 
-                    Button {
-                        onSelectLibrary()
-                        dismiss()
-                    } label: {
+                    PhotosPicker(
+                        selection: $photoPickerItem,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
                         HStack(spacing: 12) {
                             Image(systemName: "photo.on.rectangle")
                                 .font(.title3)
@@ -42,6 +44,12 @@ struct PhotoSourcePickerView: View {
                                 .foregroundStyle(.primary)
 
                             Spacer()
+                        }
+                    }
+                    .onChange(of: photoPickerItem) { _, _ in
+                        // Dismiss after selection
+                        if photoPickerItem != nil {
+                            dismiss()
                         }
                     }
                 }
@@ -82,8 +90,8 @@ struct PhotoSourcePickerView: View {
 #Preview {
     PhotoSourcePickerView(
         hasExistingPhoto: true,
+        photoPickerItem: .constant(nil),
         onSelectCamera: {},
-        onSelectLibrary: {},
         onRemovePhoto: {}
     )
 }

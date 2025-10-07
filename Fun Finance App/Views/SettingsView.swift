@@ -13,10 +13,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Reminders") {
-                    Toggle("Weekly willpower reminder", isOn: Binding(get: { viewModel.weeklyReminderEnabled }, set: { viewModel.toggleWeeklyReminder($0) }))
-                }
-
                 Section("Passcode") {
                     Toggle("Require passcode", isOn: Binding(get: { viewModel.passcodeEnabled }, set: { handlePasscodeToggle($0) }))
                     if let error = viewModel.errorMessage {
@@ -85,6 +81,6 @@ private extension SettingsView {
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
     let container = PreviewSupport.container
-    return SettingsView(viewModel: SettingsViewModel(settingsRepository: container.settingsRepository, notificationScheduler: container.notificationScheduler, passcodeManager: container.passcodeManager))
+    return SettingsView(viewModel: SettingsViewModel(settingsRepository: container.settingsRepository, passcodeManager: container.passcodeManager))
 }
 #endif

@@ -13,8 +13,38 @@ struct PhotoPickerView: View {
     }
 
     var body: some View {
-        PhotosPicker(selection: $selectedItem, matching: .images) {
-            Text("Select Photo")
+        NavigationStack {
+            VStack {
+                PhotosPicker(
+                    selection: $selectedItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    VStack(spacing: 16) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 64))
+                            .foregroundStyle(.blue)
+
+                        Text("Select a Photo")
+                            .font(.headline)
+
+                        Text("Choose from your photo library")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+            .navigationTitle("Photo Library")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
         }
         .onChange(of: selectedItem) { _, newItem in
             Task {
@@ -26,15 +56,21 @@ struct PhotoPickerView: View {
                                 onImagePicked(image)
                                 dismiss()
                             }
+                        } else {
+                            await MainActor.run {
+                                onError?("Failed to load image")
+                                dismiss()
+                            }
                         }
                     } catch {
                         await MainActor.run {
-                            onError?("Failed to load image")
+                            onError?("Failed to load image: \(error.localizedDescription)")
                             dismiss()
                         }
                     }
                 }
             }
         }
+        .interactiveDismissDisabled(selectedItem != nil)
     }
 }

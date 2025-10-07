@@ -11,7 +11,6 @@ final class AppContainer: ObservableObject {
     let itemRepository: ItemRepository
     let monthRepository: MonthRepository
     let settingsRepository: SettingsRepository
-    let notificationScheduler: NotificationScheduler
     let passcodeManager: PasscodeManager
     let rolloverService: RolloverService
     let hapticManager: HapticManager
@@ -25,23 +24,13 @@ final class AppContainer: ObservableObject {
         self.itemRepository = ItemRepository(context: controller.container.viewContext, imageStore: imageStore)
         self.settingsRepository = SettingsRepository(context: controller.container.viewContext)
         self.monthRepository = MonthRepository(context: controller.container.viewContext, itemRepository: itemRepository)
-        self.notificationScheduler = NotificationScheduler()
         self.passcodeManager = PasscodeManager()
         self.hapticManager = HapticManager.shared
         self.rolloverService = RolloverService(monthRepository: monthRepository, itemRepository: itemRepository)
 
-        Task { await configureSettings() }
-    }
-
-    private func configureSettings() async {
-        do {
-            let settings = try settingsRepository.loadAppSettings()
+        // Load passcode key synchronously (fast, no I/O)
+        if let settings = try? settingsRepository.loadAppSettings() {
             passcodeManager.setActiveKey(settings.passcodeKeychainKey)
-            notificationScheduler.requestAuthorizationIfNeeded()
-            notificationScheduler.updateWeeklyReminder(enabled: settings.weeklyReminderEnabled)
-            notificationScheduler.cancelMonthlyReminder()
-        } catch {
-            assertionFailure("Failed to load settings: \(error)")
         }
     }
 }

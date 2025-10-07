@@ -294,15 +294,12 @@ private struct HistoryItemRow: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(isWinner ?
-                    LinearGradient(colors: [Color.orange.opacity(0.1), Color.orange.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                    LinearGradient(colors: [Color(.systemBackground).opacity(0.95), Color(.systemBackground).opacity(0.95)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(isWinner ? Color.orange.opacity(0.08) : Color(.systemBackground).opacity(0.95))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(isWinner ? Color.orange.opacity(0.3) : Color.black.opacity(0.05), lineWidth: isWinner ? 2 : 1)
         )
-        .shadow(color: isWinner ? Color.orange.opacity(0.15) : Color.black.opacity(0.04), radius: isWinner ? 10 : 6, x: 0, y: 4)
     }
 
     @ViewBuilder
