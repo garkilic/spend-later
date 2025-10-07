@@ -78,26 +78,16 @@ private extension OnboardingView {
         VStack(spacing: Spacing.xl) {
             Spacer()
 
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.appSuccess.opacity(0.15))
-                    .frame(width: 120, height: 120)
-
-                Image(systemName: "brain.head.profile")
-                    .font(.system(size: 56))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.appSuccess, Color.appSuccess.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-            .padding(.bottom, Spacing.lg)
+            // App Icon
+            Image("LaunchIcon")
+                .resizable()
+                .frame(width: 120, height: 120)
+                .cornerRadius(CornerRadius.card)
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                .padding(.bottom, Spacing.lg)
 
             // Title
-            Text("Build Willpower")
+            Text("Resist. Save. Win. Repeat.")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(Color.appPrimary)
                 .multilineTextAlignment(.center)

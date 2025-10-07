@@ -1,6 +1,6 @@
 import Foundation
 
-struct MonthSummaryDisplay: Identifiable {
+struct MonthSummaryDisplay: Identifiable, Hashable {
     let id: UUID
     let monthKey: String
     let totalSaved: Decimal

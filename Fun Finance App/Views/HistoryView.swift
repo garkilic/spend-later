@@ -7,6 +7,7 @@ struct HistoryView: View {
     @State private var showingPurchaseConfirmation = false
     @State private var showingNotBuyDialog = false
     @State private var itemForConfirmation: WantedItemDisplay?
+    @State private var selectedMonthSummary: MonthSummaryDisplay?
     private let timeFormatter: DateFormatter
     private let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
     private let onItemDeleted: (WantedItemDisplay) -> Void
@@ -47,6 +48,11 @@ struct HistoryView: View {
         .sheet(item: $selectedItem) { item in
             detailSheet(for: item)
         }
+        .sheet(item: $selectedMonthSummary) { summary in
+            NavigationStack {
+                MonthDetailView(summary: summary, viewModel: viewModel)
+            }
+        }
         .alert("Not buying this item?", isPresented: $showingNotBuyDialog, presenting: itemForConfirmation) { item in
             Button("Keep Saved") {
                 // Just dismiss - keep status as .redeemed
@@ -85,6 +91,20 @@ private extension HistoryView {
                 }
             } else {
                 List {
+                    // Monthly Summaries Section
+                    if !viewModel.summaries.isEmpty {
+                        Section("Monthly History") {
+                            ForEach(viewModel.summaries.prefix(6)) { summary in
+                                Button {
+                                    selectedMonthSummary = summary
+                                } label: {
+                                    monthSummaryRow(summary: summary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
                     ForEach(viewModel.sections) { section in
                         Section(header: sectionHeader(for: section)) {
                             ForEach(section.items) { item in
@@ -149,6 +169,46 @@ private extension HistoryView {
                 .font(.subheadline)
                 .foregroundStyle(Color.secondary)
         }
+    }
+
+    @ViewBuilder
+    func monthSummaryRow(summary: MonthSummaryDisplay) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(MonthFormatter.displayName(for: summary.monthKey))
+                    .font(.headline)
+                    .foregroundStyle(Color.appPrimary)
+
+                HStack(spacing: 12) {
+                    Label("\(summary.itemCount)", systemImage: "list.bullet")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if summary.closedAt != nil {
+                        Label("Closed", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.appSuccess)
+                    } else {
+                        Label("Active", systemImage: "clock")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(CurrencyFormatter.string(from: summary.totalSaved))
+                    .font(.headline)
+                    .foregroundStyle(Color.appSuccess)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
