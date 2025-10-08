@@ -57,7 +57,11 @@ final class PersistenceController {
             container.persistentStoreDescriptions = [description]
         }
 
-        // Load store (blocking but necessary for Core Data initialization)
+        // Load store synchronously - must block to ensure database is ready
+        // However, this is now fast because:
+        // 1. Model is cached (no rebuild)
+        // 2. No persistent history tracking
+        // 3. No automatic merging
         var loadError: Error?
         container.loadPersistentStores { description, error in
             if let error {
