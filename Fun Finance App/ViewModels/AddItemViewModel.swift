@@ -10,15 +10,22 @@ final class AddItemViewModel: ObservableObject {
     @Published var tagsText: String = ""
     @Published var urlText: String = ""
     @Published var image: UIImage?
+    @Published var previewImage: UIImage?
     @Published var errorMessage: String?
     @Published var isSaving: Bool = false
+    @Published var isFetchingPreview: Bool = false
 
     private let itemRepository: ItemRepositoryProtocol
+    private let linkPreviewService: LinkPreviewServicing
     private let decimalFormatter: NumberFormatter
     private let currencyFormatter: NumberFormatter
+    private var resolvedProductURL: URL?
 
-    init(itemRepository: ItemRepositoryProtocol, locale: Locale = .current) {
+    init(itemRepository: ItemRepositoryProtocol,
+         linkPreviewService: LinkPreviewServicing? = nil,
+         locale: Locale = .current) {
         self.itemRepository = itemRepository
+        self.linkPreviewService = linkPreviewService ?? LinkPreviewService()
         let decimalFormatter = NumberFormatter()
         decimalFormatter.locale = locale
         decimalFormatter.numberStyle = .decimal
@@ -60,13 +67,19 @@ final class AddItemViewModel: ObservableObject {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
 
+            // Use resolved URL if available, otherwise use the trimmed text
+            let productURL = resolvedProductURL?.absoluteString ?? (trimmedURL.isEmpty ? nil : trimmedURL)
+
+            // Use manual photo if available, otherwise use preview image
+            let imageToSave = image ?? previewImage
+
             try itemRepository.addItem(
                 title: trimmedTitle,
                 price: price,
                 notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
                 tags: tags,
-                productURL: trimmedURL.isEmpty ? nil : trimmedURL,
-                image: image
+                productURL: productURL,
+                image: imageToSave
             )
 
             clear()
@@ -77,6 +90,45 @@ final class AddItemViewModel: ObservableObject {
         }
     }
 
+    func requestLinkPreview() async {
+        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmed.isEmpty else {
+            resolvedProductURL = nil
+            previewImage = nil
+            return
+        }
+
+        isFetchingPreview = true
+        defer { isFetchingPreview = false }
+
+        do {
+            let metadata = try await linkPreviewService.fetchMetadata(for: trimmed)
+            resolvedProductURL = metadata.normalizedURL
+
+            // Auto-fill title if empty
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let fetchedTitle = metadata.title,
+               !fetchedTitle.isEmpty {
+                title = fetchedTitle
+            }
+
+            // Auto-fill price if empty
+            if priceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let fetchedPrice = metadata.price,
+               fetchedPrice > 0 {
+                priceText = String(format: "%.2f", NSDecimalNumber(decimal: fetchedPrice).doubleValue)
+            }
+
+            // Set preview image (prefer main image, fallback to icon)
+            previewImage = metadata.image ?? metadata.icon
+        } catch {
+            // Silently fail - user can still save without preview
+            resolvedProductURL = nil
+            previewImage = nil
+        }
+    }
+
     func clear() {
         title = ""
         priceText = ""
@@ -84,6 +136,8 @@ final class AddItemViewModel: ObservableObject {
         tagsText = ""
         urlText = ""
         image = nil
+        previewImage = nil
+        resolvedProductURL = nil
         errorMessage = nil
     }
 }

@@ -9,31 +9,44 @@ struct AddItemSheet: View {
     @State private var showingCamera = false
     @State private var showingPhotoSource = false
     @State private var cameraError: String?
+    @FocusState private var isURLFieldFocused: Bool
+    @State private var lastFetchedURL: String = ""
 
     var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: Spacing.lg) {
-                    // Large prominent camera section
-                    cameraSection
+            ZStack {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: Spacing.lg) {
+                        // Large prominent camera section
+                        cameraSection
 
-                    // Input fields card
-                    inputFieldsCard
+                        // Input fields card
+                        inputFieldsCard
 
-                    // Error message
-                    if let error = viewModel.errorMessage {
-                        errorBanner(error)
+                        // Error message
+                        if let error = viewModel.errorMessage {
+                            errorBanner(error)
+                        }
                     }
+                    .padding(Spacing.sideGutter)
                 }
-                .padding(Spacing.sideGutter)
+                .scrollDismissesKeyboard(.interactively)
+                .background(Color(.systemGroupedBackground))
+
+                // Full-screen loading overlay
+                if viewModel.isFetchingPreview {
+                    FullScreenFetchingOverlay()
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("Record Impulse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        viewModel.clear()
+                        dismiss()
+                    }
+                    .disabled(viewModel.isFetchingPreview)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -43,15 +56,18 @@ struct AddItemSheet: View {
                             }
                         }
                     }
-                    .disabled(!canSave)
+                    .disabled(!canSave || viewModel.isFetchingPreview)
                 }
             }
             .sheet(isPresented: $showingPhotoSource) {
                 PhotoSourceSheet(
-                    hasPhoto: viewModel.image != nil,
+                    hasPhoto: viewModel.image != nil || viewModel.previewImage != nil,
                     photoPickerItem: $photoPickerItem,
                     onSelectCamera: { showingCamera = true },
-                    onRemovePhoto: { viewModel.image = nil }
+                    onRemovePhoto: {
+                        viewModel.image = nil
+                        viewModel.previewImage = nil
+                    }
                 )
                 .presentationDetents([.medium])
             }
@@ -87,6 +103,23 @@ struct AddItemSheet: View {
             .onChange(of: viewModel.priceText) { _, _ in
                 if viewModel.errorMessage != nil { viewModel.errorMessage = nil }
             }
+            .onChange(of: isURLFieldFocused) { _, isFocused in
+                if !isFocused {
+                    fetchPreviewIfNeeded()
+                }
+            }
+        }
+    }
+
+    private func fetchPreviewIfNeeded() {
+        let trimmed = viewModel.urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Only fetch if URL changed and is not empty
+        guard !trimmed.isEmpty, trimmed != lastFetchedURL else { return }
+
+        lastFetchedURL = trimmed
+        Task {
+            await viewModel.requestLinkPreview()
         }
     }
 
@@ -103,7 +136,7 @@ struct AddItemSheet: View {
         } label: {
             ZStack {
                 if let image = viewModel.image {
-                    // Show captured image
+                    // Show manually captured image
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -116,6 +149,29 @@ struct AddItemSheet: View {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 16))
                                 Text("Tap to change")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            .padding(12)
+                        }
+                } else if let previewImage = viewModel.previewImage {
+                    // Show fetched preview image from URL
+                    Image(uiImage: previewImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 280)
+                        .clipped()
+                        .overlay(alignment: .bottomTrailing) {
+                            // Preview indicator
+                            HStack(spacing: 6) {
+                                Image(systemName: "link.circle.fill")
+                                    .font(.system(size: 16))
+                                Text("From URL • Tap to change")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                             }
@@ -166,10 +222,12 @@ struct AddItemSheet: View {
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.card)
                     .strokeBorder(
-                        viewModel.image == nil
-                            ? Color.accentFallback.opacity(0.3)
-                            : Color.successFallback.opacity(0.5),
-                        lineWidth: viewModel.image == nil ? 2 : 3,
+                        viewModel.image != nil
+                            ? Color.successFallback.opacity(0.5)  // Manual photo - green
+                            : viewModel.previewImage != nil
+                            ? Color.accentFallback.opacity(0.5)   // Preview image - accent
+                            : Color.accentFallback.opacity(0.3),  // No image - faint accent
+                        lineWidth: (viewModel.image != nil || viewModel.previewImage != nil) ? 3 : 2,
                         antialiased: true
                     )
             )
@@ -208,17 +266,38 @@ struct AddItemSheet: View {
             Divider()
                 .padding(.leading, 60)
 
-            // URL
-            inputRow(
-                icon: "link.circle.fill",
-                iconColor: Color.accentFallback,
-                placeholder: "Product URL (Optional)",
-                field: TextField("Product URL", text: $viewModel.urlText)
+            // URL with inline loading indicator
+            HStack(alignment: .center, spacing: Spacing.md) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.accentFallback.opacity(0.15))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "link.circle.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.accentFallback)
+                }
+
+                TextField("Product URL", text: $viewModel.urlText)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
                     .font(.body)
-            )
+                    .foregroundStyle(Color.primaryFallback)
+                    .focused($isURLFieldFocused)
+                    .onSubmit {
+                        fetchPreviewIfNeeded()
+                    }
+
+                // Inline loading indicator
+                if viewModel.isFetchingPreview {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .padding(Spacing.md)
+            .background(Color.surfaceElevatedFallback)
 
             Divider()
                 .padding(.leading, 60)
@@ -304,6 +383,124 @@ struct AddItemSheet: View {
             RoundedRectangle(cornerRadius: CornerRadius.listRow)
                 .strokeBorder(Color.warningFallback.opacity(0.3), lineWidth: 1)
         )
+    }
+}
+
+private struct FullScreenFetchingOverlay: View {
+    @State private var rotationAngle: Double = 0
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var dotsOpacity: Double = 0.3
+
+    var body: some View {
+        ZStack {
+            // Full-screen blur background to block interaction
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .blur(radius: 0)
+
+            // Blurred material background
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            // Content card with animation
+            VStack(spacing: 24) {
+                // Animated circles
+                ZStack {
+                    // Outer rotating ring
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.accentFallback.opacity(0.5), Color.accentFallback.opacity(0.1)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 3
+                        )
+                        .frame(width: 100, height: 100)
+                        .rotationEffect(.degrees(rotationAngle))
+
+                    // Inner rotating ring (opposite direction)
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.successFallback.opacity(0.4), Color.successFallback.opacity(0.1)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 2
+                        )
+                        .frame(width: 70, height: 70)
+                        .rotationEffect(.degrees(-rotationAngle * 1.5))
+
+                    // Center pulsing icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentFallback.opacity(0.2))
+                            .frame(width: 50, height: 50)
+                            .scaleEffect(pulseScale)
+
+                        Image(systemName: "link")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(Color.accentFallback)
+                    }
+                }
+
+                // Animated text with dots
+                HStack(spacing: 4) {
+                    Text("Fetching preview")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.primaryFallback)
+
+                    HStack(spacing: 2) {
+                        ForEach(0..<3) { index in
+                            Circle()
+                                .fill(Color.accentFallback)
+                                .frame(width: 4, height: 4)
+                                .opacity(dotsOpacity)
+                                .animation(
+                                    .easeInOut(duration: 0.6)
+                                    .repeatForever()
+                                    .delay(Double(index) * 0.2),
+                                    value: dotsOpacity
+                                )
+                        }
+                    }
+                }
+
+                // Helpful message
+                Text("Please wait while we fetch\nproduct details...")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondaryFallback)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
+            }
+            .padding(48)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color.surfaceElevatedFallback)
+                    .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
+            )
+            .padding(40)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        .onAppear {
+            // Start rotation animation
+            withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                rotationAngle = 360
+            }
+
+            // Start pulse animation
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                pulseScale = 1.3
+            }
+
+            // Start dots animation
+            withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                dotsOpacity = 1.0
+            }
+        }
     }
 }
 
