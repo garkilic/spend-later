@@ -3,6 +3,7 @@ import PhotosUI
 
 struct AddItemSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: AddItemViewModel
 
     @State private var photoPickerItem: PhotosPickerItem?
@@ -41,6 +42,7 @@ struct AddItemSheet: View {
             .navigationTitle("Record Impulse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
