@@ -109,14 +109,14 @@ private extension OnboardingView {
             .padding(.bottom, Spacing.lg)
 
             // Title
-            Text("See your savings stack up")
+            Text("Turn temptation into savings")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Description
-            Text("Skip something tempting? Log it here. Every impulse you resist adds to a running total so you can see your willpower in dollars.")
+            Text("Every impulse you resist gets tracked. Watch your savings grow in real-time.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -148,14 +148,14 @@ private extension OnboardingView {
             .padding(.bottom, Spacing.lg)
 
             // Title
-            Text("Log the impulse in seconds")
+            Text("Log it in seconds")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Description
-            Text("Tap Record Impulse, add the price, drop in a link or photo, and jot a quick note. The more context you capture, the easier it is to stick the landing later.")
+            Text("Price, photo, note. Done. The faster you log it, the easier it is to resist.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -187,14 +187,14 @@ private extension OnboardingView {
             .padding(.bottom, Spacing.lg)
 
             // Title
-            Text("Spin at month end")
+            Text("Win one guilt-free purchase")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Description
-            Text("On the last day of each month, the spin unlocks for 6 days. Spin the wheel to randomly pick ONE item from your saved list to buy guilt-free. Everything else stays in savings—proof your discipline is working.")
+            Text("Each month, spin to pick ONE item to buy. Everything else? Pure savings.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
