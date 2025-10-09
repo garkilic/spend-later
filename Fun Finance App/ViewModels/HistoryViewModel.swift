@@ -1,13 +1,12 @@
 import Combine
 import CoreData
 import Foundation
+import SwiftUI
 import UIKit
 
 @MainActor
 final class HistoryViewModel: ObservableObject {
-    @Published var summaries: [MonthSummaryDisplay] = []
-    @Published var sections: [HistorySection] = []
-    @Published var winnerItemIds: Set<UUID> = []
+    @Published var monthSections: [MonthSection] = []
 
     private let monthRepository: MonthRepositoryProtocol
     private let itemRepository: ItemRepositoryProtocol
@@ -31,24 +30,15 @@ final class HistoryViewModel: ObservableObject {
     func refresh() {
         do {
             try reloadTaxRate()
-            let summaryEntities = try monthRepository.summaries()
-            summaries = summaryEntities.map { entity in
-                MonthSummaryDisplay(id: entity.id,
-                                    monthKey: entity.monthKey,
-                                    totalSaved: includeTax(on: entity.adjustedTotalSaved),
-                                    itemCount: Int(entity.itemCount),
-                                    winnerItemId: entity.winnerItemId,
-                                    closedAt: entity.closedAt)
-            }
-
-            // Collect all winner IDs
-            winnerItemIds = Set(summaryEntities.compactMap { $0.winnerItemId })
-
             let allItems = try itemRepository.allItems()
-            sections = makeSections(from: allItems)
+            monthSections = makeMonthSections(from: allItems)
         } catch {
             assertionFailure("Failed to load history: \(error)")
         }
+    }
+
+    func image(for item: WantedItemDisplay) -> UIImage? {
+        imageStore.loadImage(named: item.imagePath)
     }
 
     func items(for summaryId: UUID, filter: ItemStatus?) -> [WantedItemDisplay] {
@@ -58,28 +48,11 @@ final class HistoryViewModel: ObservableObject {
                 guard let filter else { return true }
                 return entity.status == filter
             }
-            return items.map { entity in
-                let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
-                let basePrice = entity.price.decimalValue
-                return WantedItemDisplay(id: entity.id,
-                                         title: entity.title,
-                                         price: basePrice,
-                                         priceWithTax: includeTax(on: basePrice),
-                                         notes: entity.notes,
-                                         tags: tags,
-                                         productURL: entity.productURL,
-                                         imagePath: entity.imagePath,
-                                         status: entity.status,
-                                         createdAt: entity.createdAt)
-            }
+            return makeDisplays(from: Array(items))
         } catch {
             assertionFailure("Failed to fetch summary items: \(error)")
             return []
         }
-    }
-
-    func image(for item: WantedItemDisplay) -> UIImage? {
-        imageStore.loadImage(named: item.imagePath)
     }
 
     func delete(_ display: WantedItemDisplay) {
@@ -94,18 +67,38 @@ final class HistoryViewModel: ObservableObject {
         }
     }
 
-    func confirmPurchase(_ display: WantedItemDisplay, purchased: Bool) {
+    func markAsBought(_ display: WantedItemDisplay) {
         do {
-            try itemRepository.confirmPurchase(itemId: display.id, purchased: purchased)
+            try itemRepository.markAsBought(itemId: display.id)
             refresh()
         } catch {
-            assertionFailure("Failed to confirm purchase: \(error)")
+            assertionFailure("Failed to mark as bought: \(error)")
+        }
+    }
+
+    func markAsSaved(_ display: WantedItemDisplay) {
+        do {
+            try itemRepository.markAsSaved(itemId: display.id)
+            refresh()
+        } catch {
+            assertionFailure("Failed to mark as saved: \(error)")
         }
     }
 }
 
 extension HistoryViewModel {
-    struct HistorySection: Identifiable {
+    struct MonthSection: Identifiable {
+        let monthKey: String
+        let monthName: String
+        let statusSections: [StatusSection]
+        let totalSaved: Decimal // saved total
+        let totalBought: Decimal // bought total
+        let netSaved: Decimal // saved - bought
+
+        var id: String { monthKey }
+    }
+
+    struct StatusSection: Identifiable {
         let status: ItemStatus
         let title: String
         let items: [WantedItemDisplay]
@@ -116,56 +109,97 @@ extension HistoryViewModel {
 }
 
 private extension HistoryViewModel {
-    func makeSections(from entities: [WantedItemEntity]) -> [HistorySection] {
-        // Define sections and their corresponding statuses
-        let sectionConfig: [(sectionStatus: ItemStatus, includedStatuses: [ItemStatus])] = [
-            (.redeemed, [.redeemed, .active]), // "Saved" includes both redeemed winners and active items
-            (.purchased, [.purchased]),         // "Purchased" includes confirmed purchases
-            (.skipped, [.skipped])              // "Won" includes items that were skipped
-        ]
+    func makeMonthSections(from entities: [WantedItemEntity]) -> [MonthSection] {
+        // Group items by month
+        let groupedByMonth = Dictionary(grouping: entities) { $0.monthKey }
 
-        return sectionConfig.compactMap { config in
-            let filtered = entities.filter { config.includedStatuses.contains($0.status) }
-            guard !filtered.isEmpty else { return nil }
+        // Sort month keys in descending order (newest first)
+        let sortedMonthKeys = groupedByMonth.keys.sorted(by: >)
 
-            let displays = filtered
-                .sorted(by: { $0.createdAt > $1.createdAt })
-                .map { entity -> WantedItemDisplay in
-                    let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
-                    let basePrice = entity.price.decimalValue
-                    return WantedItemDisplay(id: entity.id,
-                                             title: entity.title,
-                                             price: basePrice,
-                                             priceWithTax: includeTax(on: basePrice),
-                                             notes: entity.notes,
-                                             tags: tags,
-                                             productURL: entity.productURL,
-                                             imagePath: entity.imagePath,
-                                             status: entity.status,
-                                             createdAt: entity.createdAt)
-                }
+        return sortedMonthKeys.compactMap { monthKey in
+            guard let monthItems = groupedByMonth[monthKey] else { return nil }
 
-            let subtotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
-            return HistorySection(status: config.sectionStatus,
-                                  title: title(for: config.sectionStatus),
-                                  items: displays,
-                                  subtotal: subtotal)
+            // Group by status within the month
+            let savedItems = monthItems.filter { $0.status == .saved }
+            let boughtItems = monthItems.filter { $0.status == .bought }
+            let wonItems = monthItems.filter { $0.status == .won }
+
+            // Create status sections
+            var statusSections: [StatusSection] = []
+
+            // Saved section
+            if !savedItems.isEmpty {
+                let displays = makeDisplays(from: savedItems)
+                let subtotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
+                statusSections.append(StatusSection(
+                    status: .saved,
+                    title: "Saved",
+                    items: displays,
+                    subtotal: subtotal
+                ))
+            }
+
+            // Bought section
+            if !boughtItems.isEmpty {
+                let displays = makeDisplays(from: boughtItems)
+                let subtotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
+                statusSections.append(StatusSection(
+                    status: .bought,
+                    title: "Bought",
+                    items: displays,
+                    subtotal: subtotal
+                ))
+            }
+
+            // Won section
+            if !wonItems.isEmpty {
+                let displays = makeDisplays(from: wonItems)
+                let subtotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
+                statusSections.append(StatusSection(
+                    status: .won,
+                    title: "Won",
+                    items: displays,
+                    subtotal: subtotal
+                ))
+            }
+
+            guard !statusSections.isEmpty else { return nil }
+
+            // Calculate totals
+            let totalSaved = statusSections.first { $0.status == .saved }?.subtotal ?? .zero
+            let totalBought = statusSections.first { $0.status == .bought }?.subtotal ?? .zero
+            let netSaved = totalSaved - totalBought
+
+            return MonthSection(
+                monthKey: monthKey,
+                monthName: MonthFormatter.displayName(for: monthKey),
+                statusSections: statusSections,
+                totalSaved: totalSaved,
+                totalBought: totalBought,
+                netSaved: netSaved
+            )
         }
     }
 
-    func title(for status: ItemStatus) -> String {
-        switch status {
-        case .active:
-            return "Active"
-        case .skipped:
-            return "Won"
-        case .redeemed:
-            return "Saved"
-        case .purchased:
-            return "Purchased"
-        case .notPurchased:
-            return "Not Purchased"
-        }
+    func makeDisplays(from entities: [WantedItemEntity]) -> [WantedItemDisplay] {
+        entities
+            .sorted(by: { $0.createdAt > $1.createdAt })
+            .map { entity -> WantedItemDisplay in
+                let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
+                let basePrice = entity.price.decimalValue
+                return WantedItemDisplay(
+                    id: entity.id,
+                    title: entity.title,
+                    price: basePrice,
+                    priceWithTax: includeTax(on: basePrice),
+                    notes: entity.notes,
+                    tags: tags,
+                    productURL: entity.productURL,
+                    imagePath: entity.imagePath,
+                    status: entity.status,
+                    createdAt: entity.createdAt
+                )
+            }
     }
 
     func includeTax(on amount: Decimal) -> Decimal {

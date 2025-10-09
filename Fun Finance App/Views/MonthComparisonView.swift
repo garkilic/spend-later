@@ -27,7 +27,25 @@ struct MonthComparisonView: View {
     }
 
     private var availableMonths: [MonthSummaryDisplay] {
-        viewModel.summaries.filter { $0.id != currentMonth.id }
+        // Extract month summaries from monthSections
+        viewModel.monthSections.compactMap { monthSection in
+            // Calculate total for this month
+            let totalSaved = monthSection.statusSections.first { $0.status == .saved }?.subtotal ?? .zero
+            let totalBought = monthSection.statusSections.first { $0.status == .bought }?.subtotal ?? .zero
+            let wonItem = monthSection.statusSections.first { $0.status == .won }?.items.first
+
+            // Count all items in this month
+            let itemCount = monthSection.statusSections.reduce(0) { $0 + $1.items.count }
+
+            return MonthSummaryDisplay(
+                id: UUID(), // We'll use monthKey as unique identifier
+                monthKey: monthSection.monthKey,
+                totalSaved: totalSaved - totalBought,
+                itemCount: itemCount,
+                winnerItemId: wonItem?.id,
+                closedAt: wonItem != nil ? Date() : nil
+            )
+        }.filter { $0.monthKey != currentMonth.monthKey }
     }
 
     var body: some View {

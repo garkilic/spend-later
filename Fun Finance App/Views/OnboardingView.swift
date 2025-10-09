@@ -96,27 +96,17 @@ private extension OnboardingView {
 
             stepLabel(1)
 
-            // App Icon
-            if let _ = UIImage(named: "LaunchIcon") {
-                Image("LaunchIcon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.15))
                     .frame(width: 120, height: 120)
-                    .cornerRadius(CornerRadius.card)
-                    .padding(.bottom, Spacing.lg)
-            } else {
-                // Fallback icon if LaunchIcon doesn't exist
-                ZStack {
-                    RoundedRectangle(cornerRadius: CornerRadius.card)
-                        .fill(Color.appAccent)
-                        .frame(width: 120, height: 120)
 
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(Color.onAccentFallback)
-                }
-                .padding(.bottom, Spacing.lg)
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 56))
+                    .foregroundColor(.green)
             }
+            .padding(.bottom, Spacing.lg)
 
             // Title
             Text("See your savings stack up")
@@ -197,14 +187,14 @@ private extension OnboardingView {
             .padding(.bottom, Spacing.lg)
 
             // Title
-            Text("Reward yourself once a month")
+            Text("Spin at month end")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Description
-            Text("When the month wraps, we’ll remind you to choose one item you logged and actually buy it. One treat, guilt-free. Everything else stays in savings—proof your discipline is working.")
+            Text("On the last day of each month, the spin unlocks for 6 days. Spin the wheel to randomly pick ONE item from your saved list to buy guilt-free. Everything else stays in savings—proof your discipline is working.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

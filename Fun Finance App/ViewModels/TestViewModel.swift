@@ -10,6 +10,7 @@ final class TestViewModel: ObservableObject {
     @Published var itemCount: Int = 0
     @Published var testSummary: MonthSummaryEntity?
     @Published var pendingCloseout: MonthSummaryEntity?
+    @Published var daysRemainingInWindow: Int?
 
     let haptics: HapticManager
     let settingsRepository: SettingsRepositoryProtocol
@@ -51,6 +52,9 @@ final class TestViewModel: ObservableObject {
 
             // Check for pending closeout
             pendingCloseout = try rolloverService.evaluateIfNeeded()
+
+            // Calculate days remaining in claim window
+            daysRemainingInWindow = rolloverService.daysRemainingInWindow()
         } catch {
             assertionFailure("Failed to fetch items: \(error)")
         }
@@ -64,9 +68,9 @@ final class TestViewModel: ObservableObject {
             // Get existing items
             let items = try itemRepository.items(for: monthKey)
 
-            // Reset all items to active status
+            // Reset all items to saved status
             for item in items {
-                item.status = .active
+                item.status = .saved
             }
 
             // If no items exist, create some test items
@@ -90,7 +94,7 @@ final class TestViewModel: ObservableObject {
                     item.tags = tags
                     item.createdAt = Date()
                     item.monthKey = monthKey
-                    item.status = .active
+                    item.status = .saved
                 }
                 try context.save()
 
@@ -133,9 +137,9 @@ final class TestViewModel: ObservableObject {
         do {
             guard let summary = testSummary else { return }
 
-            // Reset all items back to active status
+            // Reset all items back to saved status
             for item in summary.wantedItems {
-                item.status = .active
+                item.status = .saved
             }
 
             // Clear winner
@@ -210,7 +214,7 @@ final class TestViewModel: ObservableObject {
                 item.tags = tags
                 item.createdAt = previousDate
                 item.monthKey = previousMonthKey
-                item.status = .active
+                item.status = .saved
             }
 
             try context.save()

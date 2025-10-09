@@ -54,7 +54,7 @@ struct ItemCardView: View {
                                  tags: ["clothes", "sale"],
                                  productURL: nil,
                                  imagePath: "",
-                                 status: .active,
+                                 status: .saved,
                                  createdAt: Date())
     return ItemCardView(item: item, image: nil)
         .padding()

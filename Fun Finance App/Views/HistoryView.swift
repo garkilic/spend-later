@@ -2,20 +2,8 @@ import SwiftUI
 import UIKit
 
 struct HistoryView: View {
-    enum HistoryTab: String, CaseIterable, Identifiable {
-        case months = "By Month"
-        case allItems = "All Items"
-
-        var id: String { rawValue }
-    }
-
     @StateObject private var viewModel: HistoryViewModel
-    @State private var selectedTab: HistoryTab = .months
     @State private var selectedItem: WantedItemDisplay?
-    @State private var showingPurchaseConfirmation = false
-    @State private var showingNotBuyDialog = false
-    @State private var itemForConfirmation: WantedItemDisplay?
-    @State private var selectedMonthSummary: MonthSummaryDisplay?
     private let timeFormatter: DateFormatter
     private let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
     private let onItemDeleted: (WantedItemDisplay) -> Void
@@ -34,22 +22,43 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Custom tab picker
-                tabPicker
+            ZStack {
+                backgroundGradient
 
-                ZStack {
-                    backgroundGradient
-
-                    // Tab content
-                    TabView(selection: $selectedTab) {
-                        monthsTabContent
-                            .tag(HistoryTab.months)
-
-                        allItemsTabContent
-                            .tag(HistoryTab.allItems)
+                if viewModel.monthSections.isEmpty {
+                    ScrollView {
+                        VStack(spacing: Spacing.xl) {
+                            EmptyStateView(title: "No history yet",
+                                           message: "Every impulse you resist will appear here, organized by month.")
+                                .padding(.top, 80)
+                        }
+                        .padding(.horizontal, Spacing.sideGutter)
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
+                } else {
+                    List {
+                        ForEach(viewModel.monthSections) { monthSection in
+                            Section {
+                                ForEach(monthSection.statusSections) { statusSection in
+                                    // Status subsection header
+                                    statusSectionHeader(statusSection)
+                                        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 4, trailing: 0))
+                                        .listRowBackground(Color.clear)
+
+                                    // Items in this status
+                                    ForEach(statusSection.items) { item in
+                                        itemRow(item)
+                                            .id("\(item.id)-\(item.status.rawValue)")
+                                    }
+                                }
+                            } header: {
+                                monthSectionHeader(monthSection)
+                            }
+                            .textCase(nil)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .id(viewModel.monthSections.flatMap { $0.statusSections.flatMap { $0.items.map { $0.id } } }.hashValue)
                 }
             }
             .navigationTitle("History")
@@ -58,31 +67,6 @@ struct HistoryView: View {
         .onAppear { viewModel.refresh() }
         .sheet(item: $selectedItem) { item in
             detailSheet(for: item)
-        }
-        .sheet(item: $selectedMonthSummary) { summary in
-            NavigationStack {
-                MonthDetailView(summary: summary, viewModel: viewModel)
-            }
-        }
-        .alert("Not buying this item?", isPresented: $showingNotBuyDialog, presenting: itemForConfirmation) { item in
-            Button("Keep Saved") {
-                showingNotBuyDialog = false
-                itemForConfirmation = nil
-            }
-
-            Button("Delete", role: .destructive) {
-                viewModel.delete(item)
-                onItemDeleted(item)
-                showingNotBuyDialog = false
-                itemForConfirmation = nil
-            }
-
-            Button("Cancel", role: .cancel) {
-                showingNotBuyDialog = false
-                itemForConfirmation = nil
-            }
-        } message: { item in
-            Text("Choose whether to keep this item saved for later or delete it")
         }
     }
 }
@@ -99,91 +83,58 @@ private extension HistoryView {
         .ignoresSafeArea()
     }
 
-    var tabPicker: some View {
-        HStack(spacing: 0) {
-            ForEach(HistoryTab.allCases) { tab in
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedTab = tab
-                    }
-                    HapticManager.shared.lightImpact()
-                } label: {
-                    VStack(spacing: 8) {
-                        Text(tab.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(selectedTab == tab ? .semibold : .regular)
-                            .foregroundColor(selectedTab == tab ? Color.accentColor : Color.secondary)
+    func monthSectionHeader(_ monthSection: HistoryViewModel.MonthSection) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(monthSection.monthName)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                Text(CurrencyFormatter.string(from: monthSection.netSaved))
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.successFallback)
+            }
 
-                        Rectangle()
-                            .fill(selectedTab == tab ? Color.accentColor : Color.clear)
-                            .frame(height: 2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
-                    .contentShape(Rectangle())
+            if monthSection.totalBought > 0 {
+                HStack {
+                    Text("Saved: \(CurrencyFormatter.string(from: monthSection.totalSaved))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("•")
+                        .foregroundStyle(.secondary)
+                    Text("Bought: \(CurrencyFormatter.string(from: monthSection.totalBought))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
             }
         }
-        .background(Color.surfaceElevatedFallback)
+        .padding(.vertical, 4)
     }
 
-    var monthsTabContent: some View {
-        Group {
-            if viewModel.summaries.isEmpty {
-                ScrollView {
-                    VStack(spacing: Spacing.xl) {
-                        EmptyStateView(title: "No monthly history yet",
-                                       message: "Complete your first month to see monthly summaries here.")
-                            .padding(.top, 80)
-                    }
-                    .padding(.horizontal, Spacing.sideGutter)
-                }
-            } else {
-                List {
-                    ForEach(viewModel.summaries) { summary in
-                        Button {
-                            selectedMonthSummary = summary
-                        } label: {
-                            monthSummaryRow(summary: summary)
-                        }
-                        .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(top: 8, leading: Spacing.sideGutter, bottom: 8, trailing: Spacing.sideGutter))
-                        .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-            }
+    func statusSectionHeader(_ statusSection: HistoryViewModel.StatusSection) -> some View {
+        HStack {
+            Text(statusSection.title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(colorForStatus(statusSection.status))
+            Spacer()
+            Text(CurrencyFormatter.string(from: statusSection.subtotal))
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(colorForStatus(statusSection.status))
         }
+        .padding(.horizontal, 16)
     }
 
-    var allItemsTabContent: some View {
-        Group {
-            if viewModel.sections.isEmpty {
-                ScrollView {
-                    VStack(spacing: Spacing.xl) {
-                        EmptyStateView(title: "No items yet",
-                                       message: "Every impulse you resist will appear here, organized by date.")
-                            .padding(.top, 80)
-                    }
-                    .padding(.horizontal, Spacing.sideGutter)
-                }
-            } else {
-                List {
-                    ForEach(viewModel.sections) { section in
-                        Section(header: sectionHeader(for: section)) {
-                            ForEach(section.items) { item in
-                                itemRow(item)
-                            }
-                        }
-                        .textCase(nil)
-                    }
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-            }
+    func colorForStatus(_ status: ItemStatus) -> Color {
+        switch status {
+        case .saved:
+            return Color.blue
+        case .bought:
+            return Color.red
+        case .won:
+            return Color.orange
         }
     }
 
@@ -194,33 +145,35 @@ private extension HistoryView {
             HistoryItemRow(item: item,
                            image: viewModel.image(for: item),
                            timeString: timeFormatter.string(from: item.createdAt),
-                           isWinner: viewModel.winnerItemIds.contains(item.id),
-                           needsConfirmation: item.status == .redeemed)
+                           isWinner: item.status == .won)
         }
         .buttonStyle(.plain)
         .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
         .listRowBackground(Color.clear)
         .id(item.id)
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            if item.status == .redeemed {
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if item.status == .saved {
+                // Swipe to mark as bought
                 Button {
-                    viewModel.confirmPurchase(item, purchased: true)
+                    HapticManager.shared.lightImpact()
+                    viewModel.markAsBought(item)
                 } label: {
-                    Label("Bought", systemImage: "checkmark")
+                    Label("Bought", systemImage: "checkmark.circle.fill")
                 }
                 .tint(.green)
+            } else if item.status == .bought {
+                // Swipe to undo (mark as saved)
+                Button {
+                    HapticManager.shared.lightImpact()
+                    viewModel.markAsSaved(item)
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+                .tint(.blue)
             }
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if item.status == .redeemed {
-                Button {
-                    itemForConfirmation = item
-                    showingNotBuyDialog = true
-                } label: {
-                    Label("Not Buying", systemImage: "xmark")
-                }
-                .tint(.orange)
-            } else if item.status != .skipped {
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if item.status != .won {
                 Button(role: .destructive) {
                     viewModel.delete(item)
                     onItemDeleted(item)
@@ -229,41 +182,6 @@ private extension HistoryView {
                 }
             }
         }
-    }
-
-    func sectionHeader(for section: HistoryViewModel.HistorySection) -> some View {
-        HStack {
-            Text(section.title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            Spacer()
-            Text(CurrencyFormatter.string(from: section.subtotal))
-                .font(.subheadline)
-                .foregroundStyle(Color.successFallback)
-        }
-    }
-
-    @ViewBuilder
-    func monthSummaryRow(summary: MonthSummaryDisplay) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(MonthFormatter.displayName(for: summary.monthKey))
-                    .font(.body)
-                    .fontWeight(.medium)
-
-                Text("\(summary.itemCount) items")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Text(CurrencyFormatter.string(from: summary.totalSaved))
-                .font(.body)
-                .fontWeight(.semibold)
-                .foregroundStyle(Color.successFallback)
-        }
-        .padding(.vertical, 12)
     }
 }
 
@@ -289,7 +207,6 @@ private struct HistoryItemRow: View {
     let image: UIImage?
     let timeString: String
     let isWinner: Bool
-    let needsConfirmation: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -302,7 +219,7 @@ private struct HistoryItemRow: View {
                     Spacer()
                     Text(CurrencyFormatter.string(from: item.priceWithTax))
                         .font(.headline)
-                        .foregroundStyle(isWinner ? Color.orange : Color.successFallback)
+                        .foregroundStyle(isWinner ? Color.orange : (item.status == .bought ? Color.red : Color.blue))
                 }
                 if item.priceWithTax != item.price {
                     Text("Base: \(CurrencyFormatter.string(from: item.price))")
@@ -323,17 +240,6 @@ private struct HistoryItemRow: View {
                         }
                         .foregroundStyle(Color.orange)
                     }
-                }
-                if needsConfirmation {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.caption)
-                        Text("Swipe to Confirm Purchase")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundStyle(Color.blue)
-                    .padding(.top, 4)
                 }
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)

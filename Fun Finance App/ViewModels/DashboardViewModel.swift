@@ -40,7 +40,9 @@ final class DashboardViewModel: ObservableObject {
             errorMessage = nil
             try reloadTaxRate()
             let items = try itemRepository.items(for: itemRepository.currentMonthKey)
-            let displays = makeDisplays(from: items)
+            // Filter to only show saved items on dashboard
+            let savedItems = items.filter { $0.status == .saved }
+            let displays = makeDisplays(from: savedItems)
             apply(displays: displays)
             updateReviewAvailability()
 

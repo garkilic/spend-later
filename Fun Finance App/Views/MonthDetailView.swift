@@ -9,16 +9,18 @@ struct MonthDetailView: View {
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All"
-        case redeemed = "Redeemed"
-        case skipped = "Not redeemed"
+        case saved = "Saved"
+        case bought = "Bought"
+        case won = "Won"
 
         var id: String { rawValue }
 
         var status: ItemStatus? {
             switch self {
             case .all: return nil
-            case .redeemed: return .redeemed
-            case .skipped: return .skipped
+            case .saved: return .saved
+            case .bought: return .bought
+            case .won: return .won
             }
         }
     }

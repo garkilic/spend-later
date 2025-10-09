@@ -117,13 +117,23 @@ final class ItemDetailViewModel: ObservableObject {
             .filter { !$0.isEmpty }
     }
 
-    func confirmPurchase(purchased: Bool) {
+    func markAsBought() {
         do {
-            try itemRepository.confirmPurchase(itemId: item.id, purchased: purchased)
+            try itemRepository.markAsBought(itemId: item.id)
             refreshFromStore()
             errorMessage = nil
         } catch {
-            errorMessage = "Could not confirm purchase."
+            errorMessage = "Could not mark as bought."
+        }
+    }
+
+    func markAsSaved() {
+        do {
+            try itemRepository.markAsSaved(itemId: item.id)
+            refreshFromStore()
+            errorMessage = nil
+        } catch {
+            errorMessage = "Could not mark as saved."
         }
     }
 

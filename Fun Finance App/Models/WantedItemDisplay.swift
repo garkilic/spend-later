@@ -12,8 +12,8 @@ struct WantedItemDisplay: Identifiable {
     let status: ItemStatus
     let createdAt: Date
 
-    var hasPurchaseConfirmation: Bool {
-        return status == .purchased || status == .notPurchased
+    var isBought: Bool {
+        return status == .bought
     }
 }
 

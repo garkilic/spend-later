@@ -27,6 +27,28 @@ final class RolloverService {
         return summary
     }
 
+    /// Returns the number of days remaining in the claim window, or nil if not in window
+    func daysRemainingInWindow(at date: Date = Date()) -> Int? {
+        guard isInClaimWindow(date: date) else { return nil }
+
+        let components = calendar.dateComponents([.day], from: date)
+        guard let day = components.day else { return nil }
+
+        // If we're on 1st-5th, count down to 5th
+        if day >= 1 && day <= 5 {
+            return 5 - day + 1  // e.g., on 3rd: 5-3+1 = 3 days remaining
+        }
+
+        // If we're on last day of month, we have 6 more days (rest of today + 1st-5th)
+        guard let range = calendar.range(of: .day, in: .month, for: date) else { return nil }
+        let lastDay = range.upperBound - 1
+        if day == lastDay {
+            return 6  // Last day + 5 days in next month
+        }
+
+        return nil
+    }
+
     private func isInClaimWindow(date: Date) -> Bool {
         let components = calendar.dateComponents([.day], from: date)
         guard let day = components.day else { return false }

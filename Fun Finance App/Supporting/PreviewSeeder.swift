@@ -26,7 +26,7 @@ enum PreviewSeeder {
             item.tags = ["preview", "habit \(index + 1)"]
             item.createdAt = now
             item.monthKey = currentKey
-            item.statusRaw = ItemStatus.active.rawValue
+            item.statusRaw = ItemStatus.saved.rawValue
         }
 
         let summary = MonthSummaryEntity(context: context)

@@ -71,17 +71,17 @@ final class MonthCloseoutViewModel: ObservableObject {
 
     func drawWinner() {
         guard canDraw else { return }
-        let candidates = summary.wantedItems.filter { $0.status == .active }
+        let candidates = summary.wantedItems.filter { $0.status == .saved }
         guard let winnerEntity = candidates.randomElement() else { return }
         isDrawing = true
         defer { isDrawing = false }
 
+        // Mark winner as won, others stay saved
         for item in summary.wantedItems {
             if item.id == winnerEntity.id {
-                item.status = .redeemed
-            } else {
-                item.status = .skipped
+                item.status = .won
             }
+            // Others remain .saved - no change needed
         }
         summary.winnerItemId = winnerEntity.id
         summary.closedAt = Date()
@@ -102,12 +102,12 @@ final class MonthCloseoutViewModel: ObservableObject {
         isDrawing = true
         defer { isDrawing = false }
 
+        // Mark winner as won, others stay saved
         for item in summary.wantedItems {
             if item.id == winnerEntity.id {
-                item.status = .redeemed
-            } else {
-                item.status = .skipped
+                item.status = .won
             }
+            // Others remain .saved - no change needed
         }
         summary.winnerItemId = winnerEntity.id
         summary.closedAt = Date()

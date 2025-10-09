@@ -27,6 +27,7 @@ struct AppRootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showingOnboarding = false
     @State private var hasCheckedOnboarding = false
+    @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore = false
 
     init(container: AppContainer) {
         self.container = container
@@ -89,13 +90,18 @@ struct AppRootView: View {
                 TestView(viewModel: rewardVM) { item in
                     container.imageStore.loadImage(named: item.imagePath)
                 }
-                    .tabItem { Label("Reward", systemImage: "gift.fill") }
+                    .tabItem { Label("Spin", systemImage: "sparkles") }
                     .tag(Tab.reward)
             } else {
                 Color.clear
-                    .tabItem { Label("Reward", systemImage: "gift.fill") }
+                    .tabItem { Label("Spin", systemImage: "sparkles") }
                     .tag(Tab.reward)
             }
+            }
+
+            // Splash screen overlay (only on first launch)
+            if !hasLaunchedBefore {
+                splashScreen
             }
         }
         .onChange(of: selectedTab) { _, newValue in
@@ -161,6 +167,14 @@ struct AppRootView: View {
             }
         }
         .task {
+            // On first launch, delay to show launch screen longer
+            if !hasLaunchedBefore {
+                try? await Task.sleep(for: .seconds(2))
+                withAnimation(.easeOut(duration: 0.3)) {
+                    hasLaunchedBefore = true
+                }
+            }
+
             // Check onboarding first (synchronous, fast)
             if !hasCheckedOnboarding {
                 hasCheckedOnboarding = true
@@ -199,7 +213,7 @@ struct AppRootView: View {
 
                 // Preload PhotoPicker framework for Record Impulse (low priority)
                 try? await Task.sleep(for: .seconds(2))
-                _ = await PHPhotoLibrary.authorizationStatus(for: .readWrite)
+                _ = PHPhotoLibrary.authorizationStatus(for: .readWrite)
             }
         }
         .onChange(of: scenePhase) { _, newValue in
@@ -229,6 +243,25 @@ struct AppRootView: View {
 }
 
 private extension AppRootView {
+    var splashScreen: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Image("LaunchIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 120, height: 120)
+
+                Text("Resist. Save.\nWin. Repeat.")
+                    .font(.system(size: 20, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.black)
+            }
+        }
+    }
+
     func refreshLockState() {
         do {
             let settings = try container.settingsRepository.loadAppSettings()

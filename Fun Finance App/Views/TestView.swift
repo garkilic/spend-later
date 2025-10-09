@@ -32,7 +32,7 @@ struct TestView: View {
                     .padding(.bottom, Spacing.xl)
                 }
             }
-            .navigationTitle("Monthly Reward")
+            .navigationTitle("Monthly Spin")
             .navigationBarTitleDisplayMode(.large)
             .sheet(isPresented: $showingCloseout) {
                 if let summary = viewModel.pendingCloseout {
@@ -61,8 +61,10 @@ struct TestView: View {
                 updateCountdown()
                 // Start timer to update countdown every hour
                 countdownTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
-                    viewModel.refresh()
-                    updateCountdown()
+                    Task { @MainActor in
+                        viewModel.refresh()
+                        updateCountdown()
+                    }
                 }
             }
             .onDisappear {
@@ -259,10 +261,34 @@ private extension TestView {
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            Text("Ready to Spin")
-                .font(.system(size: 42, weight: .black, design: .rounded))
+            Text("Pick Your Reward")
+                .font(.system(size: 38, weight: .black, design: .rounded))
                 .foregroundStyle(textGradient)
                 .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
+
+            Text("Spin to buy ONE item guilt-free")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
+
+            // Days remaining indicator
+            if let daysRemaining = viewModel.daysRemainingInWindow {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.caption2)
+                    Text("Available for \(daysRemaining) more \(daysRemaining == 1 ? "day" : "days")")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+                .foregroundStyle(.orange.opacity(0.8))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.orange.opacity(0.15))
+                )
+                .padding(.top, 4)
+            }
         }
     }
 
@@ -276,17 +302,26 @@ private extension TestView {
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.title2)
-                Text("Spin for Your Reward!")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                Image(systemName: "sparkles")
-                    .font(.title2)
+            VStack(spacing: 6) {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                    Text("Spin the Wheel")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                }
+
+                if viewModel.itemCount > 0 {
+                    Text("Pick 1 of \(viewModel.itemCount) items to buy")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .opacity(0.9)
+                }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 64)
+            .padding(.vertical, 12)
             .background(buttonGradient)
             .foregroundColor(.white)
             .cornerRadius(CornerRadius.button)
@@ -307,38 +342,31 @@ private extension TestView {
             .frame(maxWidth: .infinity)
 
             VStack(spacing: Spacing.xs) {
-                Text("Reward unlocks in")
-                    .font(.subheadline)
-                    .foregroundColor(Color.secondaryFallback)
-                    .fontWeight(.medium)
                 Text(timeRemaining)
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundColor(Color.primaryFallback)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                Text("until month end")
+                    .font(.subheadline)
+                    .foregroundColor(Color.secondaryFallback)
             }
 
-            if viewModel.itemCount > 0 || viewModel.pendingCloseout != nil {
-                Button {} label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "lock.fill")
-                            .font(.title3)
-                        Text(daysRemaining > 0 ? "Locked for \(daysRemaining) \(daysRemaining == 1 ? "Day" : "Days")" : "Locked Until Month End")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.gray)
-                .disabled(true)
-            } else {
-                Text("Add items this month to earn a reward")
+            Text("At month end, spin to randomly pick one item you saved this month to buy guilt-free")
+                .font(.caption)
+                .foregroundColor(Color.secondaryFallback)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.xs)
+
+            if viewModel.itemCount == 0 {
+                Text("Add items this month to unlock")
                     .font(.subheadline)
                     .foregroundColor(Color.secondaryFallback)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .padding(.top, Spacing.sm)
             }
         }
         .padding(Spacing.xl)
@@ -401,14 +429,14 @@ private extension TestView {
 
                 HowItWorksRow(
                     number: "2",
-                    title: "Build your savings",
-                    description: "Every item you skip adds to your total saved"
+                    title: "Resist & save",
+                    description: "Skip buying them and watch your savings grow"
                 )
 
                 HowItWorksRow(
                     number: "3",
-                    title: "Win a reward",
-                    description: "At month's end, spin to win ONE item—you saved money on all the rest!"
+                    title: "Spin to pick ONE",
+                    description: "At month end, randomly pick ONE item to buy guilt-free—you saved on all the rest!"
                 )
             }
 
@@ -438,10 +466,14 @@ private extension TestView {
             // Header with progress indicator
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("CURRENT MONTH")
+                    Text("THIS MONTH'S POOL")
                         .sectionHeaderStyle()
                     if viewModel.itemCount > 0 {
-                        Text("\(viewModel.itemCount) items in the pool")
+                        Text("\(viewModel.itemCount) \(viewModel.itemCount == 1 ? "item" : "items") • Resets next month")
+                            .font(.caption)
+                            .foregroundColor(Color.secondaryFallback)
+                    } else {
+                        Text("Pool resets each month")
                             .font(.caption)
                             .foregroundColor(Color.secondaryFallback)
                     }

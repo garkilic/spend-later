@@ -75,11 +75,6 @@ struct ItemDetailView: View {
             tagsSection
             linkSection
 
-            // Redemption confirmation section for winner items
-            if viewModel.item.status == .redeemed && !viewModel.item.hasPurchaseConfirmation {
-                redemptionSection
-            }
-
             Section {
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
@@ -291,51 +286,6 @@ private extension ItemDetailView {
         }
     }
 
-    var redemptionSection: some View {
-        Section {
-            VStack(spacing: Spacing.md) {
-                HStack(spacing: 8) {
-                    Image(systemName: "trophy.fill")
-                        .font(.title2)
-                        .foregroundStyle(.orange)
-
-                    Text("Did you claim this reward?")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text("Let us know if you actually bought this item to adjust your savings total.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(spacing: Spacing.md) {
-                    Button {
-                        viewModel.confirmPurchase(purchased: true)
-                        onUpdate(viewModel.item)
-                    } label: {
-                        Label("Yes, I bought it", systemImage: "checkmark.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-
-                    Button {
-                        viewModel.confirmPurchase(purchased: false)
-                        onUpdate(viewModel.item)
-                    } label: {
-                        Label("No, I didn't", systemImage: "xmark.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-            .padding(.vertical, Spacing.sm)
-        } header: {
-            Text("Redemption Confirmation")
-        }
-    }
-
     var infoSection: some View {
         Section("Price") {
             if isEditing {
@@ -347,29 +297,17 @@ private extension ItemDetailView {
                         .font(.title3)
                 }
             } else {
-                Button {
-                    isEditing = true
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(CurrencyFormatter.string(from: viewModel.item.price))
-                                .font(.title3)
-                                .foregroundStyle(.primary)
-                            if viewModel.item.priceWithTax != viewModel.item.price {
-                                Text("With tax: \(CurrencyFormatter.string(from: viewModel.item.priceWithTax))")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CurrencyFormatter.string(from: viewModel.item.price))
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                    if viewModel.item.priceWithTax != viewModel.item.price {
+                        Text("With tax: \(CurrencyFormatter.string(from: viewModel.item.priceWithTax))")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, 8)
             }
         }
     }
@@ -381,24 +319,11 @@ private extension ItemDetailView {
                     .textInputAutocapitalization(.words)
                     .focused($focusedField, equals: .title)
             } else {
-                Button {
-                    isEditing = true
-                    focusedField = .title
-                } label: {
-                    HStack(spacing: 12) {
-                        Text(viewModel.item.title)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
+                Text(viewModel.item.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
                     .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -418,31 +343,17 @@ private extension ItemDetailView {
                         .focused($focusedField, equals: .notes)
                 }
             } else {
-                Button {
-                    isEditing = true
-                    focusedField = .notes
-                } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let notes = viewModel.item.notes, !notes.isEmpty {
-                                Text(notes)
-                                    .foregroundStyle(.primary)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(3)
-                            } else {
-                                Text("No notes")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let notes = viewModel.item.notes, !notes.isEmpty {
+                        Text(notes)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                    } else {
+                        Text("No notes")
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, 8)
             }
         }
     }
@@ -455,26 +366,15 @@ private extension ItemDetailView {
                     .autocorrectionDisabled()
                     .focused($focusedField, equals: .tags)
             } else {
-                Button {
-                    isEditing = true
-                    focusedField = .tags
-                } label: {
-                    HStack(alignment: .center, spacing: 12) {
-                        if viewModel.item.tags.isEmpty {
-                            Text("No tags")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            TagListView(tags: viewModel.item.tags)
-                        }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                HStack(alignment: .center, spacing: 12) {
+                    if viewModel.item.tags.isEmpty {
+                        Text("No tags")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        TagListView(tags: viewModel.item.tags)
                     }
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, 8)
             }
         }
     }
@@ -502,21 +402,9 @@ private extension ItemDetailView {
                     .contentShape(Rectangle())
                 }
             } else {
-                Button {
-                    isEditing = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Text("No link provided")
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
+                Text("No link provided")
+                    .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
         }
     }

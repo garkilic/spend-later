@@ -34,8 +34,13 @@ struct MonthCloseoutView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Your Reward")
-                        .font(.headline)
+                    VStack(spacing: 2) {
+                        Text("Pick Your Item")
+                            .font(.headline)
+                        Text(viewModel.title)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if showWinner {
@@ -54,7 +59,7 @@ struct MonthCloseoutView: View {
 
 private extension MonthCloseoutView {
     var spinningCarousel: some View {
-        let activeItems = viewModel.items.filter { $0.status == .active }
+        let activeItems = viewModel.items.filter { $0.status == .saved }
         let cardWidth: CGFloat = 200
         let spacing: CGFloat = 20
         let totalWidth = CGFloat(activeItems.count) * (cardWidth + spacing)
@@ -140,7 +145,22 @@ private extension MonthCloseoutView {
                 }
                 .frame(height: 150)
 
-                Text("🎉 Congratulations! 🎉")
+                // Month indicator
+                Text(viewModel.title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.orange.opacity(0.15))
+                    )
+                    .scaleEffect(showWinner ? 1.0 : 0.8)
+                    .opacity(showWinner ? 1.0 : 0.0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.25), value: showWinner)
+
+                Text("You Can Buy This!")
                     .font(.system(.title, design: .rounded))
                     .fontWeight(.black)
                     .foregroundStyle(
@@ -153,6 +173,13 @@ private extension MonthCloseoutView {
                     .scaleEffect(showWinner ? 1.0 : 0.8)
                     .opacity(showWinner ? 1.0 : 0.0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3), value: showWinner)
+
+                Text("Guilt-free purchase ✨")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .scaleEffect(showWinner ? 1.0 : 0.8)
+                    .opacity(showWinner ? 1.0 : 0.0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.35), value: showWinner)
             }
 
             // Winner card with bounce animation
@@ -181,33 +208,43 @@ private extension MonthCloseoutView {
             .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.4), value: showWinner)
 
             // KPI Stats
-            // Items that were skipped (not selected as winner)
-            let skippedItems = viewModel.items.filter { $0.status == .skipped }
-            let skippedCount = skippedItems.count
-            let totalSaved = skippedItems.reduce(Decimal.zero) { $0 + $1.priceWithTax }
+            // Items that were not selected as winner (remain saved)
+            let nonWinnerItems = viewModel.items.filter { $0.status == .saved }
+            let resistedCount = nonWinnerItems.count
+            let totalSaved = nonWinnerItems.reduce(Decimal.zero) { $0 + $1.priceWithTax }
 
-            HStack(spacing: Spacing.lg) {
-                // Money Saved
-                WinnerKPI(
-                    icon: "dollarsign.circle.fill",
-                    value: CurrencyFormatter.string(from: totalSaved),
-                    label: "Total Saved",
-                    color: Color.successFallback
-                )
-                .scaleEffect(showWinner ? 1.0 : 0.5)
-                .opacity(showWinner ? 1.0 : 0.0)
-                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.6), value: showWinner)
+            VStack(spacing: Spacing.sm) {
+                Text("You saved on everything else!")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .scaleEffect(showWinner ? 1.0 : 0.8)
+                    .opacity(showWinner ? 1.0 : 0.0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: showWinner)
 
-                // Temptations Resisted
-                WinnerKPI(
-                    icon: "hand.raised.fill",
-                    value: "\(skippedCount)",
-                    label: skippedCount == 1 ? "Temptation Resisted" : "Temptations Resisted",
-                    color: Color.orange
-                )
-                .scaleEffect(showWinner ? 1.0 : 0.5)
-                .opacity(showWinner ? 1.0 : 0.0)
-                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.7), value: showWinner)
+                HStack(spacing: Spacing.lg) {
+                    // Money Saved
+                    WinnerKPI(
+                        icon: "dollarsign.circle.fill",
+                        value: CurrencyFormatter.string(from: totalSaved),
+                        label: "Money Saved",
+                        color: Color.successFallback
+                    )
+                    .scaleEffect(showWinner ? 1.0 : 0.5)
+                    .opacity(showWinner ? 1.0 : 0.0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.6), value: showWinner)
+
+                    // Temptations Resisted
+                    WinnerKPI(
+                        icon: "hand.raised.fill",
+                        value: "\(resistedCount)",
+                        label: resistedCount == 1 ? "Item Skipped" : "Items Skipped",
+                        color: Color.orange
+                    )
+                    .scaleEffect(showWinner ? 1.0 : 0.5)
+                    .opacity(showWinner ? 1.0 : 0.0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.7), value: showWinner)
+                }
             }
             .padding(.horizontal, Spacing.lg)
 
@@ -219,7 +256,7 @@ private extension MonthCloseoutView {
     func startSpin() {
         guard viewModel.canDraw else { return }
 
-        let candidates = viewModel.items.filter { $0.status == .active }
+        let candidates = viewModel.items.filter { $0.status == .saved }
         guard !candidates.isEmpty else { return }
 
         // Pick winner
@@ -359,7 +396,7 @@ private struct WinnerKPI: View {
     item1.tags = ["style", "fitness"]
     item1.createdAt = Date()
     item1.monthKey = summary.monthKey
-    item1.status = .active
+    item1.status = .saved
 
     let item2 = WantedItemEntity(context: context)
     item2.id = UUID()
@@ -369,7 +406,7 @@ private struct WinnerKPI: View {
     item2.tags = ["audio"]
     item2.createdAt = Date()
     item2.monthKey = summary.monthKey
-    item2.status = .active
+    item2.status = .saved
 
     summary.items = NSSet(array: [item1, item2])
 

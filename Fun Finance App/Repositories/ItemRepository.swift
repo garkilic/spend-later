@@ -15,7 +15,8 @@ protocol ItemRepositoryProtocol {
     func item(with id: UUID) throws -> WantedItemEntity?
     func updateItem(id: UUID, title: String, notes: String?, tags: [String], productURL: String?) throws
     func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) throws
-    func confirmPurchase(itemId: UUID, purchased: Bool) throws
+    func markAsBought(itemId: UUID) throws
+    func markAsSaved(itemId: UUID) throws
 }
 
 struct ItemSnapshot {
@@ -67,7 +68,7 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.tags = tags
         item.createdAt = Date()
         item.monthKey = monthKey(for: item.createdAt)
-        item.status = .active
+        item.status = .saved
         try saveIfNeeded()
     }
 
@@ -82,7 +83,7 @@ final class ItemRepository: ItemRepositoryProtocol {
         let request = WantedItemEntity.fetchRequest(forMonthKey: monthKey)
         request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             NSPredicate(format: "monthKey == %@", monthKey),
-            NSPredicate(format: "statusRaw == %@", ItemStatus.active.rawValue)
+            NSPredicate(format: "statusRaw == %@", ItemStatus.saved.rawValue)
         ])
         request.fetchBatchSize = 10
         request.returnsObjectsAsFaults = true
@@ -182,17 +183,17 @@ final class ItemRepository: ItemRepositoryProtocol {
         try saveIfNeeded()
     }
 
-    func confirmPurchase(itemId: UUID, purchased: Bool) throws {
+    func markAsBought(itemId: UUID) throws {
         guard let entity = try item(with: itemId) else { return }
-        entity.actuallyPurchased = purchased
+        entity.actuallyPurchased = true
+        entity.status = .bought
+        try saveIfNeeded()
+    }
 
-        // Update status
-        if purchased {
-            entity.status = .purchased
-        } else {
-            entity.status = .notPurchased
-        }
-
+    func markAsSaved(itemId: UUID) throws {
+        guard let entity = try item(with: itemId) else { return }
+        entity.actuallyPurchased = false
+        entity.status = .saved
         try saveIfNeeded()
     }
 }

@@ -200,7 +200,7 @@ private extension PersistenceController {
         statusRaw.name = "statusRaw"
         statusRaw.attributeType = .stringAttributeType
         statusRaw.isOptional = false
-        statusRaw.defaultValue = ItemStatus.active.rawValue
+        statusRaw.defaultValue = ItemStatus.saved.rawValue
         properties.append(statusRaw)
 
         return properties

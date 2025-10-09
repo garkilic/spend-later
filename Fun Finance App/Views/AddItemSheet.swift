@@ -13,129 +13,27 @@ struct AddItemSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: Spacing.md) {
-                        // Input fields card with integrated camera
-                    VStack(spacing: 0) {
-                        // Photo button
-                        Button {
-                            showingPhotoSource = true
-                        } label: {
-                            HStack(spacing: Spacing.sm) {
-                                Image(systemName: viewModel.image == nil ? "camera.fill" : "checkmark.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(viewModel.image == nil ? Color.accentFallback : Color.successFallback)
-                                    .frame(width: 32, height: 32)
-                                    .background(
-                                        (viewModel.image == nil ? Color.accentFallback : Color.successFallback)
-                                            .opacity(0.18)
-                                    )
-                                    .clipShape(Circle())
+                VStack(spacing: Spacing.lg) {
+                    // Large prominent camera section
+                    cameraSection
 
-                                Text(viewModel.image == nil ? "Add Photo (Optional)" : "Photo Added")
-                                    .foregroundStyle(Color.primaryFallback)
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.secondaryFallback)
-                            }
-                            .padding(Spacing.md)
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider().padding(.leading, 48)
-
-                        // Title
-                        inputRow(
-                            icon: "tag.fill",
-                            color: Color.accentFallback,
-                            field: TextField("What did you resist?", text: $viewModel.title)
-                                .disableAutocorrection(true)
-                        )
-
-                        Divider().padding(.leading, 48)
-
-                        // Price
-                        inputRow(
-                            icon: "dollarsign.circle.fill",
-                            color: Color.successFallback,
-                            field: TextField("Price", text: $viewModel.priceText)
-                                .keyboardType(.decimalPad)
-                                .disableAutocorrection(true)
-                        )
-
-                        Divider().padding(.leading, 48)
-
-                        // URL
-                        inputRow(
-                            icon: "link.circle.fill",
-                            color: Color.accentFallback,
-                            field: TextField("Product URL", text: $viewModel.urlText)
-                                .keyboardType(.URL)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                        )
-
-                        Divider().padding(.leading, 48)
-
-                        // Notes
-                        inputRow(
-                            icon: "note.text",
-                            color: Color.secondaryFallback,
-                            alignment: .firstTextBaseline,
-                            field: TextField("Notes", text: $viewModel.notes, axis: .vertical)
-                                .lineLimit(3...6)
-                                .disableAutocorrection(true)
-                                .multilineTextAlignment(.leading)
-                                .padding(.vertical, 4)
-                        )
-
-                        Divider().padding(.leading, 48)
-
-                        // Tags
-                        inputRow(
-                            icon: "number",
-                            color: Color.secondaryFallback,
-                            field: TextField("Tags (comma separated)", text: $viewModel.tagsText)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                        )
-                    }
-                    .background(Color.surfaceElevatedFallback)
-                    .cornerRadius(CornerRadius.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: CornerRadius.card)
-                            .stroke(Color.separatorFallback.opacity(0.3), lineWidth: 1)
-                    )
+                    // Input fields card
+                    inputFieldsCard
 
                     // Error message
                     if let error = viewModel.errorMessage {
-                        HStack(spacing: Spacing.sm) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(Color.warningFallback)
-                            Text(error)
-                                .font(.footnote)
-                                .foregroundStyle(Color.primaryFallback)
-                            Spacer()
-                        }
-                        .padding(Spacing.md)
-                        .background(Color.warningFallback.opacity(0.1))
-                        .cornerRadius(CornerRadius.listRow)
+                        errorBanner(error)
                     }
-                    }
-                    .padding(Spacing.sideGutter)
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .padding(Spacing.sideGutter)
+            }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Record Impulse")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.accentFallback, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -145,8 +43,7 @@ struct AddItemSheet: View {
                             }
                         }
                     }
-                    .fontWeight(.semibold)
-                    .disabled(viewModel.isSaving)
+                    .disabled(!canSave)
                 }
             }
             .sheet(isPresented: $showingPhotoSource) {
@@ -193,23 +90,220 @@ struct AddItemSheet: View {
         }
     }
 
+    private var canSave: Bool {
+        !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !viewModel.priceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !viewModel.isSaving
+    }
+
     @ViewBuilder
-    private func inputRow<Field: View>(icon: String, color: Color, alignment: VerticalAlignment = .center, field: Field) -> some View {
-        HStack(alignment: alignment, spacing: Spacing.sm) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(color)
-                .frame(width: 32, height: 32)
-                .background(color.opacity(0.18))
-                .clipShape(Circle())
-                .alignmentGuide(.firstTextBaseline) { dimensions in
-                    // For multiline fields, align icon to top instead of center
-                    dimensions[.top] + 16 // Half of icon height (32/2) for optical alignment
+    private var cameraSection: some View {
+        Button {
+            showingPhotoSource = true
+        } label: {
+            ZStack {
+                if let image = viewModel.image {
+                    // Show captured image
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 280)
+                        .clipped()
+                        .overlay(alignment: .bottomTrailing) {
+                            // Edit indicator
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16))
+                                Text("Tap to change")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            .padding(12)
+                        }
+                } else {
+                    // Empty state - imperative to add photo
+                    VStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.accentFallback.opacity(0.15))
+                                .frame(width: 80, height: 80)
+
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 36))
+                                .foregroundStyle(Color.accentFallback)
+                        }
+
+                        VStack(spacing: 4) {
+                            Text("Add Photo")
+                                .font(.headline)
+                                .foregroundStyle(Color.primaryFallback)
+
+                            Text("Capture what you resisted")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.secondaryFallback)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 280)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color.accentFallback.opacity(0.08),
+                                Color.accentFallback.opacity(0.03)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                 }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.card)
+                    .strokeBorder(
+                        viewModel.image == nil
+                            ? Color.accentFallback.opacity(0.3)
+                            : Color.successFallback.opacity(0.5),
+                        lineWidth: viewModel.image == nil ? 2 : 3,
+                        antialiased: true
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var inputFieldsCard: some View {
+        VStack(spacing: 0) {
+            // Title
+            inputRow(
+                icon: "tag.fill",
+                iconColor: Color.accentFallback,
+                placeholder: "What did you resist?",
+                field: TextField("What did you resist?", text: $viewModel.title)
+                    .disableAutocorrection(true)
+                    .font(.body.weight(.medium))
+            )
+
+            Divider()
+                .padding(.leading, 60)
+
+            // Price
+            inputRow(
+                icon: "dollarsign.circle.fill",
+                iconColor: Color.successFallback,
+                placeholder: "Price",
+                field: TextField("Price", text: $viewModel.priceText)
+                    .keyboardType(.decimalPad)
+                    .disableAutocorrection(true)
+                    .font(.body.weight(.medium))
+            )
+
+            Divider()
+                .padding(.leading, 60)
+
+            // URL
+            inputRow(
+                icon: "link.circle.fill",
+                iconColor: Color.accentFallback,
+                placeholder: "Product URL (Optional)",
+                field: TextField("Product URL", text: $viewModel.urlText)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .font(.body)
+            )
+
+            Divider()
+                .padding(.leading, 60)
+
+            // Notes
+            inputRow(
+                icon: "note.text",
+                iconColor: Color.orange,
+                placeholder: "Notes (Optional)",
+                alignment: .top,
+                field: TextField("Notes", text: $viewModel.notes, axis: .vertical)
+                    .lineLimit(3...6)
+                    .disableAutocorrection(true)
+                    .multilineTextAlignment(.leading)
+                    .font(.body)
+                    .padding(.vertical, 8)
+            )
+
+            Divider()
+                .padding(.leading, 60)
+
+            // Tags
+            inputRow(
+                icon: "number",
+                iconColor: Color.purple,
+                placeholder: "Tags (Optional)",
+                field: TextField("Tags (comma separated)", text: $viewModel.tagsText)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .font(.body)
+            )
+        }
+        .background(Color.surfaceElevatedFallback)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.card)
+                .strokeBorder(Color.separatorFallback.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    @ViewBuilder
+    private func inputRow<Field: View>(
+        icon: String,
+        iconColor: Color,
+        placeholder: String,
+        alignment: VerticalAlignment = .center,
+        field: Field
+    ) -> some View {
+        HStack(alignment: alignment, spacing: Spacing.md) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(iconColor.opacity(0.15))
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(iconColor)
+            }
 
             field
+                .foregroundStyle(Color.primaryFallback)
         }
         .padding(Spacing.md)
+        .background(Color.surfaceElevatedFallback)
+    }
+
+    @ViewBuilder
+    private func errorBanner(_ error: String) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.warningFallback)
+            Text(error)
+                .font(.footnote)
+                .foregroundStyle(Color.primaryFallback)
+            Spacer()
+        }
+        .padding(Spacing.md)
+        .background(Color.warningFallback.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.listRow))
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.listRow)
+                .strokeBorder(Color.warningFallback.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 

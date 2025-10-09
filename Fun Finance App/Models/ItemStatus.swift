@@ -1,9 +1,7 @@
 import Foundation
 
 enum ItemStatus: String, CaseIterable {
-    case active
-    case redeemed       // Won the spin, pending confirmation
-    case purchased      // Confirmed: user bought it
-    case notPurchased   // Confirmed: user didn't buy it
-    case skipped
+    case saved      // Default: item uploaded/saved
+    case bought     // User manually bought this item
+    case won        // Item won the monthly spin
 }
