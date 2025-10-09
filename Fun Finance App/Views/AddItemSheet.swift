@@ -40,6 +40,7 @@ struct AddItemSheet: View {
             }
             .navigationTitle("Record Impulse")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
