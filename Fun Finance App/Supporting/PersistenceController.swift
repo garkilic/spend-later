@@ -1,4 +1,5 @@
 import CoreData
+import CloudKit
 
 final class PersistenceController {
     static let shared = PersistenceController()
@@ -13,10 +14,10 @@ final class PersistenceController {
         return makeModel(for: ModelVersion.current)
     }()
 
-    let container: NSPersistentContainer
+    let container: NSPersistentCloudKitContainer
 
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "SpendLaterModel", managedObjectModel: Self.cachedModel)
+        container = NSPersistentCloudKitContainer(name: "SpendLaterModel", managedObjectModel: Self.cachedModel)
 
         if inMemory {
             let description = NSPersistentStoreDescription()
@@ -34,34 +35,53 @@ final class PersistenceController {
                 try? FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true, attributes: nil)
             }
 
-            let description = NSPersistentStoreDescription(url: storeURL)
+            // Check if migration from local-only store is needed
+            let migrationKey = "HasMigratedToCloudKit"
+            let hasMigrated = UserDefaults.standard.bool(forKey: migrationKey)
 
-            // One-time migration: Remove persistent history tracking to fix read-only mode
-            let migrationKey = "didMigratePersistentHistory_v1"
-            let needsMigration = !UserDefaults.standard.bool(forKey: migrationKey) &&
-                                 FileManager.default.fileExists(atPath: storeURL.path)
+            if !hasMigrated && FileManager.default.fileExists(atPath: storeURL.path) {
+                // Existing local store found - need to migrate to CloudKit
+                print("⚠️ Migrating existing store to CloudKit...")
 
-            if needsMigration {
-                print("CoreData: Migrating store to remove persistent history tracking...")
-                // Remove old store files to start fresh
-                try? FileManager.default.removeItem(at: storeURL)
-                try? FileManager.default.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-shm"))
-                try? FileManager.default.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-wal"))
+                // Remove old store files to start fresh with CloudKit
+                let fileManager = FileManager.default
+                try? fileManager.removeItem(at: storeURL)
+                try? fileManager.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-shm"))
+                try? fileManager.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-wal"))
+
                 UserDefaults.standard.set(true, forKey: migrationKey)
+                print("✅ Migration complete - starting with fresh CloudKit-enabled store")
             }
 
-            // Disable persistent history tracking for better performance (single-device app)
-            description.setOption(false as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+            let description = NSPersistentStoreDescription(url: storeURL)
+
+            // Check if user is signed into iCloud
+            let isSignedIntoiCloud = FileManager.default.ubiquityIdentityToken != nil
+
+            if isSignedIntoiCloud {
+                print("✅ iCloud account detected - enabling CloudKit sync")
+
+                // Enable CloudKit sync
+                description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+                    containerIdentifier: "iCloud.punkproduct.Fun-Finance-App"
+                )
+
+                // Enable persistent history tracking - required for CloudKit sync
+                description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+
+                // Enable remote change notifications
+                description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+            } else {
+                print("⚠️ No iCloud account - CloudKit sync disabled (data will be local only)")
+                // CloudKit will be disabled, app will work with local storage only
+            }
+
             description.shouldMigrateStoreAutomatically = true
             description.shouldInferMappingModelAutomatically = true
             container.persistentStoreDescriptions = [description]
         }
 
         // Load store synchronously - must block to ensure database is ready
-        // However, this is now fast because:
-        // 1. Model is cached (no rebuild)
-        // 2. No persistent history tracking
-        // 3. No automatic merging
         var loadError: Error?
         container.loadPersistentStores { description, error in
             if let error {
@@ -70,15 +90,31 @@ final class PersistenceController {
         }
 
         if let loadError {
+            print("❌ Core Data load error: \(loadError)")
+            print("❌ Error details: \(loadError.localizedDescription)")
+            if let nsError = loadError as NSError? {
+                print("❌ Error domain: \(nsError.domain)")
+                print("❌ Error code: \(nsError.code)")
+                print("❌ Error userInfo: \(nsError.userInfo)")
+            }
             fatalError("Core Data failed to load: \(loadError.localizedDescription)")
         }
 
-        // Optimize view context for performance - especially on device
+        // Configure view context for CloudKit sync
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        container.viewContext.automaticallyMergesChangesFromParent = false // Reduce overhead
+        container.viewContext.automaticallyMergesChangesFromParent = true // Required for CloudKit sync
         container.viewContext.undoManager = nil
         container.viewContext.shouldDeleteInaccessibleFaults = true
-        container.viewContext.stalenessInterval = -1 // No automatic refreshing
+
+        // Watch for remote changes from CloudKit
+        NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: container.persistentStoreCoordinator,
+            queue: .main
+        ) { [weak self] _ in
+            // Refresh all objects to pick up remote changes
+            self?.container.viewContext.refreshAllObjects()
+        }
     }
 }
 
@@ -87,8 +123,9 @@ private enum ModelVersion: String {
     case v2 = "SpendLaterModelV2"
     case v3 = "SpendLaterModelV3"
     case v4 = "SpendLaterModelV4"
+    case v5 = "SpendLaterModelV5" // CloudKit-compatible model
 
-    static var current: ModelVersion { .v4 }
+    static var current: ModelVersion { .v5 }
 }
 
 private extension PersistenceController {
@@ -126,19 +163,21 @@ private extension PersistenceController {
         let id = NSAttributeDescription()
         id.name = "id"
         id.attributeType = .UUIDAttributeType
-        id.isOptional = false
+        id.isOptional = true // CloudKit requires optional or default value
         properties.append(id)
 
         let title = NSAttributeDescription()
         title.name = "title"
         title.attributeType = .stringAttributeType
         title.isOptional = false
+        title.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(title)
 
         let price = NSAttributeDescription()
         price.name = "price"
         price.attributeType = .decimalAttributeType
         price.isOptional = false
+        price.defaultValue = NSDecimalNumber.zero // CloudKit requires default for non-optional
         properties.append(price)
 
         let notes = NSAttributeDescription()
@@ -153,7 +192,7 @@ private extension PersistenceController {
         productText.isOptional = true
         properties.append(productText)
 
-        if version != .v1 {
+        if version != .v1 { // v2, v3, v4, v5 all have productURL
             let productURL = NSAttributeDescription()
             productURL.name = "productURL"
             productURL.attributeType = .stringAttributeType
@@ -161,7 +200,7 @@ private extension PersistenceController {
             properties.append(productURL)
         }
 
-        if version == .v3 || version == .v4 {
+        if version == .v3 || version == .v4 || version == .v5 {
             let tagsRaw = NSAttributeDescription()
             tagsRaw.name = "tagsRaw"
             tagsRaw.attributeType = .stringAttributeType
@@ -169,7 +208,7 @@ private extension PersistenceController {
             properties.append(tagsRaw)
         }
 
-        if version == .v4 {
+        if version == .v4 || version == .v5 {
             let actuallyPurchased = NSAttributeDescription()
             actuallyPurchased.name = "actuallyPurchased"
             actuallyPurchased.attributeType = .booleanAttributeType
@@ -182,18 +221,21 @@ private extension PersistenceController {
         imagePath.name = "imagePath"
         imagePath.attributeType = .stringAttributeType
         imagePath.isOptional = false
+        imagePath.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(imagePath)
 
         let createdAt = NSAttributeDescription()
         createdAt.name = "createdAt"
         createdAt.attributeType = .dateAttributeType
         createdAt.isOptional = false
+        createdAt.defaultValue = Date() // CloudKit requires default for non-optional
         properties.append(createdAt)
 
         let monthKey = NSAttributeDescription()
         monthKey.name = "monthKey"
         monthKey.attributeType = .stringAttributeType
         monthKey.isOptional = false
+        monthKey.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(monthKey)
 
         let statusRaw = NSAttributeDescription()
@@ -212,13 +254,14 @@ private extension PersistenceController {
         let id = NSAttributeDescription()
         id.name = "id"
         id.attributeType = .UUIDAttributeType
-        id.isOptional = false
+        id.isOptional = true // CloudKit requires optional or default value
         properties.append(id)
 
         let monthKey = NSAttributeDescription()
         monthKey.name = "monthKey"
         monthKey.attributeType = .stringAttributeType
         monthKey.isOptional = false
+        monthKey.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(monthKey)
 
         let totalSaved = NSAttributeDescription()
@@ -278,7 +321,7 @@ private extension PersistenceController {
         let id = NSAttributeDescription()
         id.name = "id"
         id.attributeType = .UUIDAttributeType
-        id.isOptional = false
+        id.isOptional = true // CloudKit requires optional or default value
         properties.append(id)
 
         let currencyCode = NSAttributeDescription()

@@ -12,7 +12,7 @@ class MockItemRepository: ItemRepositoryProtocol {
 
     var currentMonthKey: String = "2025,09"
 
-    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) throws {
+    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) async throws {
         addedItems.append((title, price))
     }
 
@@ -61,6 +61,18 @@ class MockItemRepository: ItemRepositoryProtocol {
     }
 
     func updateItem(id: UUID, title: String, notes: String?, tags: [String], productURL: String?) throws {
+        // Mock implementation
+    }
+
+    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) async throws {
+        // Mock implementation
+    }
+
+    func markAsBought(itemId: UUID) throws {
+        // Mock implementation
+    }
+
+    func markAsSaved(itemId: UUID) throws {
         // Mock implementation
     }
 }
@@ -134,7 +146,7 @@ class MockSettingsRepository: SettingsRepositoryProtocol {
 class MockImageStore: ImageStoring {
     var savedImages: [String: UIImage] = [:]
 
-    func save(image: UIImage) throws -> String {
+    func save(image: UIImage) async throws -> String {
         let filename = UUID().uuidString
         savedImages[filename] = image
         return filename

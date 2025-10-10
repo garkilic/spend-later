@@ -216,10 +216,12 @@ struct ItemDetailView: View {
 
     private func saveChanges() {
         focusedField = nil // Dismiss keyboard
-        viewModel.saveChanges()
-        if viewModel.errorMessage == nil {
-            isEditing = false
-            onUpdate(viewModel.item)
+        Task {
+            await viewModel.saveChanges()
+            if viewModel.errorMessage == nil {
+                isEditing = false
+                onUpdate(viewModel.item)
+            }
         }
     }
 

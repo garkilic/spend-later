@@ -14,6 +14,7 @@ final class AppContainer: ObservableObject {
     let passcodeManager: PasscodeManager
     let rolloverService: RolloverService
     let hapticManager: HapticManager
+    let cloudKitSyncMonitor: CloudKitSyncMonitor
 
     var viewContext: NSManagedObjectContext { persistenceController.container.viewContext }
 
@@ -27,6 +28,7 @@ final class AppContainer: ObservableObject {
         self.passcodeManager = PasscodeManager()
         self.hapticManager = HapticManager.shared
         self.rolloverService = RolloverService(monthRepository: monthRepository, itemRepository: itemRepository)
+        self.cloudKitSyncMonitor = CloudKitSyncMonitor(container: controller.container)
 
         // Load passcode key synchronously (fast, no I/O)
         if let settings = try? settingsRepository.loadAppSettings() {

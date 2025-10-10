@@ -4,7 +4,7 @@ import UIKit
 protocol ItemRepositoryProtocol {
     var currentMonthKey: String { get }
     var context: NSManagedObjectContext { get }
-    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) throws
+    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) async throws
     func items(for monthKey: String) throws -> [WantedItemEntity]
     func activeItems(for monthKey: String) throws -> [WantedItemEntity]
     func allItems() throws -> [WantedItemEntity]
@@ -14,7 +14,7 @@ protocol ItemRepositoryProtocol {
     func monthKey(for date: Date) -> String
     func item(with id: UUID) throws -> WantedItemEntity?
     func updateItem(id: UUID, title: String, notes: String?, tags: [String], productURL: String?) throws
-    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) throws
+    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) async throws
     func markAsBought(itemId: UUID) throws
     func markAsSaved(itemId: UUID) throws
 }
@@ -50,10 +50,10 @@ final class ItemRepository: ItemRepositoryProtocol {
         monthKey(for: Date())
     }
 
-    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) throws {
+    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) async throws {
         let filename: String
         if let image {
-            filename = try imageStore.save(image: image)
+            filename = try await imageStore.save(image: image)
         } else {
             filename = ""
         }
@@ -151,9 +151,12 @@ final class ItemRepository: ItemRepositoryProtocol {
         entity.productURL = productURL
         entity.productText = nil
         try saveIfNeeded()
+
+        // Refresh the object to ensure subsequent fetches get fresh data
+        context.refresh(entity, mergeChanges: false)
     }
 
-    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) throws {
+    func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) async throws {
         guard let entity = try item(with: id) else { return }
         entity.title = title
         if let price = price {
@@ -173,7 +176,7 @@ final class ItemRepository: ItemRepositoryProtocol {
 
             // Save new image if provided
             if let image = image {
-                let filename = try imageStore.save(image: image)
+                let filename = try await imageStore.save(image: image)
                 entity.imagePath = filename
             } else {
                 entity.imagePath = ""
@@ -181,6 +184,10 @@ final class ItemRepository: ItemRepositoryProtocol {
         }
 
         try saveIfNeeded()
+
+        // Refresh the object to ensure subsequent fetches get fresh data
+        // This is necessary because stalenessInterval is set to -1 in PersistenceController
+        context.refresh(entity, mergeChanges: false)
     }
 
     func markAsBought(itemId: UUID) throws {
@@ -188,6 +195,9 @@ final class ItemRepository: ItemRepositoryProtocol {
         entity.actuallyPurchased = true
         entity.status = .bought
         try saveIfNeeded()
+
+        // Refresh the object to ensure subsequent fetches get fresh data
+        context.refresh(entity, mergeChanges: false)
     }
 
     func markAsSaved(itemId: UUID) throws {
@@ -195,6 +205,9 @@ final class ItemRepository: ItemRepositoryProtocol {
         entity.actuallyPurchased = false
         entity.status = .saved
         try saveIfNeeded()
+
+        // Refresh the object to ensure subsequent fetches get fresh data
+        context.refresh(entity, mergeChanges: false)
     }
 }
 

@@ -73,7 +73,7 @@ final class AddItemViewModel: ObservableObject {
             // Use manual photo if available, otherwise use preview image
             let imageToSave = image ?? previewImage
 
-            try itemRepository.addItem(
+            try await itemRepository.addItem(
                 title: trimmedTitle,
                 price: price,
                 notes: trimmedNotes.isEmpty ? nil : trimmedNotes,

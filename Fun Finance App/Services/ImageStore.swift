@@ -1,7 +1,7 @@
 import UIKit
 
 protocol ImageStoring {
-    func save(image: UIImage) throws -> String
+    func save(image: UIImage) async throws -> String
     func loadImage(named filename: String) -> UIImage?
     func deleteImage(named filename: String)
 }
@@ -23,10 +23,15 @@ final class ImageStore: ImageStoring {
         imageCache.totalCostLimit = 20 * 1024 * 1024 // 20MB instead of 50MB
     }
 
-    func save(image: UIImage) throws -> String {
+    func save(image: UIImage) async throws -> String {
         let filename = UUID().uuidString + ".jpg"
         let url = directoryURL.appendingPathComponent(filename)
-        let data = try compress(image: image)
+
+        // Perform compression on background thread to avoid blocking UI
+        let data = try await Task.detached(priority: .userInitiated) {
+            try ImageStore.compress(image: image, targetSize: 500_000)
+        }.value
+
         try data.write(to: url, options: .atomic)
         return filename
     }
@@ -69,13 +74,13 @@ private extension ImageStore {
         try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
     }
 
-    func compress(image: UIImage) throws -> Data {
+    nonisolated static func compress(image: UIImage, targetSize: Int) throws -> Data {
         var quality: CGFloat = 0.7
         guard var data = image.jpegData(compressionQuality: quality) else {
             throw NSError(domain: "ImageStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to create JPEG data"])
         }
 
-        while data.count > targetSizeInBytes && quality > 0.3 {
+        while data.count > targetSize && quality > 0.3 {
             quality -= 0.1
             if let newData = image.jpegData(compressionQuality: quality) {
                 data = newData

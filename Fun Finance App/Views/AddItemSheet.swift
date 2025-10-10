@@ -3,7 +3,6 @@ import PhotosUI
 
 struct AddItemSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: AddItemViewModel
 
     @State private var photoPickerItem: PhotosPickerItem?
@@ -42,7 +41,6 @@ struct AddItemSheet: View {
             .navigationTitle("Record Impulse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -249,6 +247,7 @@ struct AddItemSheet: View {
                 placeholder: "What did you resist?",
                 field: TextField("What did you resist?", text: $viewModel.title)
                     .disableAutocorrection(true)
+                    .textContentType(.none)
                     .font(.body.weight(.medium))
             )
 
@@ -263,6 +262,7 @@ struct AddItemSheet: View {
                 field: TextField("Price", text: $viewModel.priceText)
                     .keyboardType(.decimalPad)
                     .disableAutocorrection(true)
+                    .textContentType(.none)
                     .font(.body.weight(.medium))
             )
 
@@ -286,6 +286,7 @@ struct AddItemSheet: View {
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
+                    .textContentType(.none)
                     .font(.body)
                     .foregroundStyle(Color.primaryFallback)
                     .focused($isURLFieldFocused)
@@ -314,6 +315,7 @@ struct AddItemSheet: View {
                 field: TextField("Notes", text: $viewModel.notes, axis: .vertical)
                     .lineLimit(3...6)
                     .disableAutocorrection(true)
+                    .textContentType(.none)
                     .multilineTextAlignment(.leading)
                     .font(.body)
                     .padding(.vertical, 8)
@@ -330,6 +332,7 @@ struct AddItemSheet: View {
                 field: TextField("Tags (comma separated)", text: $viewModel.tagsText)
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
+                    .textContentType(.none)
                     .font(.body)
             )
         }

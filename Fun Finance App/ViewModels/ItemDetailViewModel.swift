@@ -51,7 +51,7 @@ final class ItemDetailViewModel: ObservableObject {
         }
     }
 
-    func saveChanges() {
+    func saveChanges() async {
         isSaving = true
         defer { isSaving = false }
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,14 +78,14 @@ final class ItemDetailViewModel: ObservableObject {
         let tags = normalizedTags()
 
         do {
-            try itemRepository.updateItem(id: item.id,
-                                          title: trimmedTitle,
-                                          price: price,
-                                          notes: normalizedNotes.isEmpty ? nil : normalizedNotes,
-                                          tags: tags,
-                                          productURL: normalizedURL.isEmpty ? nil : normalizedURL,
-                                          image: editedImage,
-                                          replaceImage: hasImageChanged)
+            try await itemRepository.updateItem(id: item.id,
+                                                title: trimmedTitle,
+                                                price: price,
+                                                notes: normalizedNotes.isEmpty ? nil : normalizedNotes,
+                                                tags: tags,
+                                                productURL: normalizedURL.isEmpty ? nil : normalizedURL,
+                                                image: editedImage,
+                                                replaceImage: hasImageChanged)
             hasImageChanged = false
             editedImage = nil
             refreshFromStore()
