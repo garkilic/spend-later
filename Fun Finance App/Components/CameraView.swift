@@ -33,17 +33,24 @@ class CameraViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // Stop session on background thread to prevent blocking
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession?.stopRunning()
-        }
+        // Camera should already be stopped, but ensure cleanup happens
+        ensureCameraIsStopped()
     }
 
     deinit {
+        ensureCameraIsStopped()
         stopCamera()
     }
 
+    private func ensureCameraIsStopped() {
+        // Only stop if still running (idempotent)
+        if let session = captureSession, session.isRunning {
+            session.stopRunning()
+        }
+    }
+
     private func stopCamera() {
+        // Clean up all resources
         captureSession?.stopRunning()
         captureSession = nil
         photoOutput = nil
@@ -211,30 +218,44 @@ class CameraViewController: UIViewController {
 
 extension CameraViewController: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        // Stop camera session first
+        // CRITICAL: Stop camera session IMMEDIATELY and SYNCHRONOUSLY
+        // This prevents the -17281 errors and keyboard blocking issues
+        if let session = captureSession, session.isRunning {
+            session.stopRunning()
+        }
+
+        // Process photo on background thread to avoid blocking
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession?.stopRunning()
-        }
+            guard let self = self else { return }
 
-        if let error = error {
-            DispatchQueue.main.async { [weak self] in
-                self?.onError?("Failed to capture photo: \(error.localizedDescription)")
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.onError?("Failed to capture photo: \(error.localizedDescription)")
+                    self.cleanupAndDismiss()
+                }
+                return
             }
-            return
-        }
 
-        guard let imageData = photo.fileDataRepresentation(),
-              let image = UIImage(data: imageData) else {
-            DispatchQueue.main.async { [weak self] in
-                self?.onError?("Failed to process photo")
+            guard let imageData = photo.fileDataRepresentation(),
+                  let image = UIImage(data: imageData) else {
+                DispatchQueue.main.async {
+                    self.onError?("Failed to process photo")
+                    self.cleanupAndDismiss()
+                }
+                return
             }
-            return
-        }
 
-        // Call callbacks on main thread
-        DispatchQueue.main.async { [weak self] in
-            self?.onImageCaptured?(image)
-            self?.onDismiss?()
+            // Call callbacks on main thread with cleaned up resources
+            DispatchQueue.main.async {
+                self.onImageCaptured?(image)
+                self.cleanupAndDismiss()
+            }
         }
+    }
+
+    private func cleanupAndDismiss() {
+        // Ensure camera is fully stopped and cleaned up
+        stopCamera()
+        onDismiss?()
     }
 }

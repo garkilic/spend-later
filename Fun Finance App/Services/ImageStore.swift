@@ -11,6 +11,8 @@ final class ImageStore: ImageStoring {
     private let directoryURL: URL
     private let targetSizeInBytes = 500_000
     private var imageCache = NSCache<NSString, UIImage>()
+    private var compressedDataCache = NSCache<NSString, NSData>()
+    private let processingQueue = ImageProcessingQueue.shared
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -18,19 +20,38 @@ final class ImageStore: ImageStoring {
         directoryURL = appSupport.appendingPathComponent("Images", isDirectory: true)
         createDirectoryIfNeeded()
 
-        // Configure cache - smaller limits for device
-        imageCache.countLimit = 20 // Reduced from 50
-        imageCache.totalCostLimit = 20 * 1024 * 1024 // 20MB instead of 50MB
+        // Configure image cache - smaller limits for device
+        imageCache.countLimit = 20
+        imageCache.totalCostLimit = 20 * 1024 * 1024 // 20MB
+
+        // Configure compressed data cache for faster re-saves
+        compressedDataCache.countLimit = 10
+        compressedDataCache.totalCostLimit = 5 * 1024 * 1024 // 5MB
     }
 
     func save(image: UIImage) async throws -> String {
         let filename = UUID().uuidString + ".jpg"
         let url = directoryURL.appendingPathComponent(filename)
 
-        // Perform compression on background thread to avoid blocking UI
-        let data = try await Task.detached(priority: .userInitiated) {
-            try ImageStore.compress(image: image, targetSize: 500_000)
-        }.value
+        // Check if we have cached compressed data for this image
+        let cacheKey = "\(image.hash)" as NSString
+        let data: Data
+
+        if let cachedData = compressedDataCache.object(forKey: cacheKey) as Data? {
+            data = cachedData
+        } else {
+            // First, preprocess the image (resize if needed) for faster compression
+            let processed = await processingQueue.process(image)
+
+            // Use the optimized (resized) image for compression
+            data = try await processingQueue.compress(
+                image: processed.optimized,
+                targetSize: targetSizeInBytes
+            )
+
+            // Cache the compressed data
+            compressedDataCache.setObject(data as NSData, forKey: cacheKey)
+        }
 
         try data.write(to: url, options: .atomic)
         return filename
@@ -72,22 +93,5 @@ private extension ImageStore {
     func createDirectoryIfNeeded() {
         guard !fileManager.fileExists(atPath: directoryURL.path) else { return }
         try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-    }
-
-    nonisolated static func compress(image: UIImage, targetSize: Int) throws -> Data {
-        var quality: CGFloat = 0.7
-        guard var data = image.jpegData(compressionQuality: quality) else {
-            throw NSError(domain: "ImageStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to create JPEG data"])
-        }
-
-        while data.count > targetSize && quality > 0.3 {
-            quality -= 0.1
-            if let newData = image.jpegData(compressionQuality: quality) {
-                data = newData
-            } else {
-                break
-            }
-        }
-        return data
     }
 }

@@ -14,12 +14,15 @@ final class AddItemViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isSaving: Bool = false
     @Published var isFetchingPreview: Bool = false
+    @Published var isProcessingImage: Bool = false
 
     private let itemRepository: ItemRepositoryProtocol
     private let linkPreviewService: LinkPreviewServicing
     private let decimalFormatter: NumberFormatter
     private let currencyFormatter: NumberFormatter
     private var resolvedProductURL: URL?
+    private var processedImageTask: Task<Void, Never>?
+    private var cachedImageFilename: String?
 
     init(itemRepository: ItemRepositoryProtocol,
          linkPreviewService: LinkPreviewServicing? = nil,
@@ -70,23 +73,62 @@ final class AddItemViewModel: ObservableObject {
             // Use resolved URL if available, otherwise use the trimmed text
             let productURL = resolvedProductURL?.absoluteString ?? (trimmedURL.isEmpty ? nil : trimmedURL)
 
-            // Use manual photo if available, otherwise use preview image
-            let imageToSave = image ?? previewImage
+            // Wait for any ongoing image processing to complete
+            await processedImageTask?.value
 
-            try await itemRepository.addItem(
-                title: trimmedTitle,
-                price: price,
-                notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
-                tags: tags,
-                productURL: productURL,
-                image: imageToSave
-            )
+            // FAST PATH: If we have a cached filename, use synchronous save (instant)
+            if let cachedFilename = cachedImageFilename {
+                try itemRepository.addItem(
+                    title: trimmedTitle,
+                    price: price,
+                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                    tags: tags,
+                    productURL: productURL,
+                    cachedImageFilename: cachedFilename
+                )
+            } else {
+                // SLOW PATH: Process image during save (fallback)
+                let imageToSave = image ?? previewImage
+                try await itemRepository.addItem(
+                    title: trimmedTitle,
+                    price: price,
+                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                    tags: tags,
+                    productURL: productURL,
+                    image: imageToSave
+                )
+            }
 
             clear()
             return true
         } catch {
             errorMessage = "Failed to save item"
             return false
+        }
+    }
+
+    /// Start processing an image in the background (non-blocking)
+    func processImage(_ image: UIImage) {
+        // Cancel any existing processing
+        processedImageTask?.cancel()
+        cachedImageFilename = nil
+
+        self.image = image
+        self.isProcessingImage = true
+
+        // Process and save image in background without blocking UI
+        processedImageTask = Task { @MainActor in
+            do {
+                // This does all the heavy lifting (resize + compress) NOW
+                // So when user clicks Save, it's instant
+                let filename = try await itemRepository.preprocessAndCacheImage(image)
+                self.cachedImageFilename = filename
+                self.isProcessingImage = false
+            } catch {
+                // If preprocessing fails, fall back to processing during save
+                self.cachedImageFilename = nil
+                self.isProcessingImage = false
+            }
         }
     }
 
@@ -139,6 +181,10 @@ final class AddItemViewModel: ObservableObject {
         previewImage = nil
         resolvedProductURL = nil
         errorMessage = nil
+        processedImageTask?.cancel()
+        processedImageTask = nil
+        cachedImageFilename = nil
+        isProcessingImage = false
     }
 }
 

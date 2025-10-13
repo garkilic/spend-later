@@ -16,6 +16,15 @@ class MockItemRepository: ItemRepositoryProtocol {
         addedItems.append((title, price))
     }
 
+    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, cachedImageFilename: String?) throws {
+        addedItems.append((title, price))
+    }
+
+    func preprocessAndCacheImage(_ image: UIImage) async throws -> String {
+        let filename = UUID().uuidString
+        return filename
+    }
+
     func items(for monthKey: String) throws -> [WantedItemEntity] {
         return itemsToReturn
     }

@@ -38,7 +38,6 @@ struct AddItemSheet: View {
                     FullScreenFetchingOverlay()
                 }
             }
-            .navigationTitle("Record Impulse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
@@ -47,17 +46,22 @@ struct AddItemSheet: View {
                         viewModel.clear()
                         dismiss()
                     }
-                    .disabled(viewModel.isFetchingPreview)
+                    .disabled(viewModel.isFetchingPreview || viewModel.isProcessingImage)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            if await viewModel.save() {
-                                dismiss()
+                    if viewModel.isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button("Save") {
+                            Task {
+                                if await viewModel.save() {
+                                    dismiss()
+                                }
                             }
                         }
+                        .disabled(!canSave || viewModel.isFetchingPreview)
                     }
-                    .disabled(!canSave || viewModel.isFetchingPreview)
                 }
             }
             .sheet(isPresented: $showingPhotoSource) {
@@ -74,19 +78,41 @@ struct AddItemSheet: View {
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView(
-                    onImageCaptured: { viewModel.image = $0 },
+                    onImageCaptured: { image in
+                        // Process image asynchronously - UI remains responsive
+                        viewModel.processImage(image)
+                    },
                     onError: { cameraError = $0 }
                 )
                 .ignoresSafeArea()
             }
             .onChange(of: photoPickerItem) { _, newItem in
+                guard let newItem else { return }
+
+                // Show loading indicator immediately
+                viewModel.isProcessingImage = true
+
                 Task {
-                    if let newItem,
-                       let data = try? await newItem.loadTransferable(type: Data.self),
-                       let loadedImage = UIImage(data: data) {
+                    defer {
+                        photoPickerItem = nil
+                    }
+
+                    do {
+                        // Load image data asynchronously
+                        if let data = try await newItem.loadTransferable(type: Data.self),
+                           let loadedImage = UIImage(data: data) {
+                            await MainActor.run {
+                                // Process image in background
+                                viewModel.processImage(loadedImage)
+                            }
+                        } else {
+                            await MainActor.run {
+                                viewModel.isProcessingImage = false
+                            }
+                        }
+                    } catch {
                         await MainActor.run {
-                            viewModel.image = loadedImage
-                            photoPickerItem = nil
+                            viewModel.isProcessingImage = false
                         }
                     }
                 }
@@ -127,7 +153,8 @@ struct AddItemSheet: View {
     private var canSave: Bool {
         !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !viewModel.priceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !viewModel.isSaving
+        !viewModel.isSaving &&
+        !viewModel.isProcessingImage
     }
 
     @ViewBuilder
@@ -158,6 +185,12 @@ struct AddItemSheet: View {
                             .padding(.vertical, 8)
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                             .padding(12)
+                        }
+                        .overlay {
+                            // Processing overlay
+                            if viewModel.isProcessingImage {
+                                ImageProcessingOverlay()
+                            }
                         }
                 } else if let previewImage = viewModel.previewImage {
                     // Show fetched preview image from URL
@@ -551,6 +584,51 @@ private struct PhotoSourceSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+        }
+    }
+}
+
+private struct ImageProcessingOverlay: View {
+    @State private var rotationAngle: Double = 0
+
+    var body: some View {
+        ZStack {
+            // Semi-transparent backdrop
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+
+            // Processing indicator
+            VStack(spacing: 12) {
+                // Animated spinner
+                Circle()
+                    .trim(from: 0, to: 0.7)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.3)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .frame(width: 40, height: 40)
+                    .rotationEffect(.degrees(rotationAngle))
+
+                Text("Optimizing...")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+        }
+        .transition(.opacity)
+        .onAppear {
+            withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                rotationAngle = 360
             }
         }
     }
