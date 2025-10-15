@@ -20,7 +20,13 @@ struct WantedItemDisplay: Identifiable {
 
 extension WantedItemDisplay: Hashable {
     static func == (lhs: WantedItemDisplay, rhs: WantedItemDisplay) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.title == rhs.title &&
+        lhs.price == rhs.price &&
+        lhs.notes == rhs.notes &&
+        lhs.tags == rhs.tags &&
+        lhs.productURL == rhs.productURL &&
+        lhs.status == rhs.status
     }
 
     func hash(into hasher: inout Hasher) {

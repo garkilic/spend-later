@@ -32,7 +32,7 @@ final class PersistenceController {
             // Check if we need to reset due to schema upgrade
             // This should ONLY happen when migrating from old v5 schema, not on every reinstall
             let schemaVersionKey = "CoreDataSchemaVersion"
-            let currentSchemaVersion = "v7_imageData_cloudkit_asset"
+            let currentSchemaVersion = "v8_productURLData_cloudkit_asset"
             let savedSchemaVersion = UserDefaults.standard.string(forKey: schemaVersionKey)
             let localStoreExists = FileManager.default.fileExists(atPath: storeURL.path)
 
@@ -87,7 +87,7 @@ final class PersistenceController {
                 print("🔧 CloudKit Environment: DEVELOPMENT (Debug build)")
                 #else
                 print("🚀 CloudKit Environment: PRODUCTION (Release/TestFlight build)")
-                print("⚠️ IMPORTANT: Production CloudKit must have v7 schema deployed!")
+                print("⚠️ IMPORTANT: Production CloudKit must have v8 schema deployed!")
                 print("⚠️ If sync fails, deploy schema from Development to Production in CloudKit Dashboard")
                 #endif
 
@@ -148,7 +148,7 @@ final class PersistenceController {
             if nsError.domain == "NSCloudKitErrorDomain" || nsError.code == 134400 || nsError.code == 134060 {
                 print("⚠️ CloudKit Configuration Issue - attempting LOCAL-ONLY fallback")
                 print("⚠️ Data will be stored locally but NOT sync to iCloud")
-                print("⚠️ Fix: Deploy v6 schema to Production CloudKit")
+                print("⚠️ Fix: Deploy v8 schema to Production CloudKit")
 
                 // Retry without CloudKit - recalculate store URL
                 let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -290,10 +290,11 @@ private enum ModelVersion: String {
     case v5 = "SpendLaterModelV5" // CloudKit-compatible model
     case v6 = "SpendLaterModelV6" // Removed imageData - caused sync issues
     case v7 = "SpendLaterModelV7" // Re-added imageData with CloudKit Asset support
+    case v8 = "SpendLaterModelV8" // Added productURLData for URL CloudKit syncing
 
     static var current: ModelVersion {
-        // Use v7 - includes imageData with external storage for CloudKit Assets
-        return .v7
+        // Use v8 - includes productURLData with external storage for CloudKit URL syncing
+        return .v8
     }
 }
 
@@ -369,7 +370,7 @@ private extension PersistenceController {
             properties.append(productURL)
         }
 
-        if version == .v3 || version == .v4 || version == .v5 || version == .v6 || version == .v7 {
+        if version == .v3 || version == .v4 || version == .v5 || version == .v6 || version == .v7 || version == .v8 {
             let tagsRaw = NSAttributeDescription()
             tagsRaw.name = "tagsRaw"
             tagsRaw.attributeType = .stringAttributeType
@@ -377,7 +378,7 @@ private extension PersistenceController {
             properties.append(tagsRaw)
         }
 
-        if version == .v4 || version == .v5 || version == .v6 || version == .v7 {
+        if version == .v4 || version == .v5 || version == .v6 || version == .v7 || version == .v8 {
             let actuallyPurchased = NSAttributeDescription()
             actuallyPurchased.name = "actuallyPurchased"
             actuallyPurchased.attributeType = .booleanAttributeType
@@ -393,14 +394,24 @@ private extension PersistenceController {
         imagePath.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(imagePath)
 
-        // v7: Add imageData with CloudKit Asset support
-        if version == .v7 {
+        // v7+: Add imageData with CloudKit Asset support
+        if version == .v7 || version == .v8 {
             let imageData = NSAttributeDescription()
             imageData.name = "imageData"
             imageData.attributeType = .binaryDataAttributeType
             imageData.isOptional = true // Optional so items without images can still sync
             imageData.allowsExternalBinaryDataStorage = true // Store externally - CloudKit converts to CKAsset
             properties.append(imageData)
+        }
+
+        // v8: Add productURLData for URL CloudKit syncing (mirrors imageData approach)
+        if version == .v8 {
+            let productURLData = NSAttributeDescription()
+            productURLData.name = "productURLData"
+            productURLData.attributeType = .binaryDataAttributeType
+            productURLData.isOptional = true // Optional so items without URLs can still sync
+            productURLData.allowsExternalBinaryDataStorage = true // Store externally - CloudKit converts to CKAsset
+            properties.append(productURLData)
         }
 
         let createdAt = NSAttributeDescription()

@@ -105,7 +105,7 @@ final class ItemDetailViewModel: ObservableObject {
                                  priceWithTax: includeTax(on: basePrice),
                                  notes: entity.notes,
                                  tags: tags,
-                                 productURL: entity.productURL,
+                                 productURL: itemRepository.loadURL(for: entity),
                                  imagePath: entity.imagePath,
                                  imageData: entity.imageData,
                                  status: entity.status,

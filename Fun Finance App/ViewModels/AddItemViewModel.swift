@@ -122,14 +122,15 @@ final class AddItemViewModel: ObservableObject {
             let metadata = try await linkPreviewService.fetchMetadata(for: trimmed)
             resolvedProductURL = metadata.normalizedURL
 
-            // Auto-fill title if empty
+            // Only auto-fill title if user hasn't entered one yet
+            // This preserves user's manual input before pasting URL
             if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let fetchedTitle = metadata.title,
                !fetchedTitle.isEmpty {
                 title = fetchedTitle
             }
 
-            // Auto-fill price if empty
+            // Only auto-fill price if user hasn't entered one yet
             if priceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let fetchedPrice = metadata.price,
                fetchedPrice > 0 {

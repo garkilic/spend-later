@@ -18,6 +18,7 @@ protocol ItemRepositoryProtocol {
     func markAsBought(itemId: UUID) throws
     func markAsSaved(itemId: UUID) throws
     func loadImage(for item: WantedItemEntity) -> UIImage?
+    func loadURL(for item: WantedItemEntity) -> String?
 }
 
 struct ItemSnapshot {
@@ -58,7 +59,17 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.price = NSDecimalNumber(decimal: price)
         item.notes = notes
         item.productText = nil
-        item.productURL = productURL
+
+        // Handle URL storage - save to both productURL (local string) AND productURLData (CloudKit Asset)
+        if let productURL = productURL, !productURL.isEmpty {
+            item.productURL = productURL
+            // Store URL as Data for CloudKit sync (avoids string length limits)
+            item.productURLData = productURL.data(using: .utf8)
+            print("✅ Product URL saved: \(productURL)")
+        } else {
+            item.productURL = nil
+            item.productURLData = nil
+        }
 
         // Handle image storage - save to both local file (imagePath) AND imageData (CloudKit Asset)
         if let image {
@@ -129,7 +140,16 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.price = NSDecimalNumber(decimal: snapshot.price)
         item.notes = snapshot.notes
         item.productText = nil
-        item.productURL = snapshot.productURL
+
+        // Restore URL to both fields
+        if let productURL = snapshot.productURL, !productURL.isEmpty {
+            item.productURL = productURL
+            item.productURLData = productURL.data(using: .utf8)
+        } else {
+            item.productURL = nil
+            item.productURLData = nil
+        }
+
         item.imagePath = snapshot.imagePath
         item.tags = snapshot.tags
         item.createdAt = snapshot.createdAt
@@ -144,7 +164,7 @@ final class ItemRepository: ItemRepositoryProtocol {
                      price: item.price.decimalValue,
                      notes: item.notes,
                      tags: item.tags,
-                     productURL: item.productURL,
+                     productURL: loadURL(for: item),
                      imagePath: item.imagePath,
                      createdAt: item.createdAt,
                      monthKey: item.monthKey,
@@ -167,8 +187,17 @@ final class ItemRepository: ItemRepositoryProtocol {
         entity.title = title
         entity.notes = notes
         entity.tags = tags
-        entity.productURL = productURL
         entity.productText = nil
+
+        // Update URL in both fields
+        if let productURL = productURL, !productURL.isEmpty {
+            entity.productURL = productURL
+            entity.productURLData = productURL.data(using: .utf8)
+        } else {
+            entity.productURL = nil
+            entity.productURLData = nil
+        }
+
         try saveIfNeeded()
 
         // Refresh the object to ensure subsequent fetches get fresh data
@@ -183,8 +212,16 @@ final class ItemRepository: ItemRepositoryProtocol {
         }
         entity.notes = notes
         entity.tags = tags
-        entity.productURL = productURL
         entity.productText = nil
+
+        // Update URL in both fields
+        if let productURL = productURL, !productURL.isEmpty {
+            entity.productURL = productURL
+            entity.productURLData = productURL.data(using: .utf8)
+        } else {
+            entity.productURL = nil
+            entity.productURLData = nil
+        }
 
         // Handle image replacement
         if replaceImage {
@@ -247,6 +284,18 @@ final class ItemRepository: ItemRepositoryProtocol {
         }
 
         return nil
+    }
+
+    func loadURL(for item: WantedItemEntity) -> String? {
+        // Priority 1: Load from CloudKit-synced productURLData (if available)
+        if let urlData = item.productURLData,
+           let urlString = String(data: urlData, encoding: .utf8),
+           !urlString.isEmpty {
+            return urlString
+        }
+
+        // Priority 2: Fallback to local productURL string
+        return item.productURL
     }
 }
 

@@ -16,6 +16,7 @@ final class AppContainer: ObservableObject {
     let hapticManager: HapticManager
     let cloudKitSyncMonitor: CloudKitSyncMonitor
     let imageMigrationService: ImageMigrationService
+    let urlMigrationService: URLMigrationService
 
     var viewContext: NSManagedObjectContext { persistenceController.container.viewContext }
 
@@ -31,16 +32,22 @@ final class AppContainer: ObservableObject {
         self.rolloverService = RolloverService(monthRepository: monthRepository, itemRepository: itemRepository)
         self.cloudKitSyncMonitor = CloudKitSyncMonitor(container: controller.container)
         self.imageMigrationService = ImageMigrationService(context: controller.container.viewContext, imageStore: imageStore)
+        self.urlMigrationService = URLMigrationService(context: controller.container.viewContext)
 
         // Load passcode key synchronously (fast, no I/O)
         if let settings = try? settingsRepository.loadAppSettings() {
             passcodeManager.setActiveKey(settings.passcodeKeychainKey)
         }
 
-        // Run image migration in background (one-time operation)
+        // Run migrations in background (one-time operations)
         // Migrates existing local images to imageData for CloudKit sync
         Task.detached(priority: .utility) {
             try? await self.imageMigrationService.migrateImagesToCloudKit()
+        }
+
+        // Migrate existing URLs to productURLData for CloudKit sync
+        Task.detached(priority: .utility) {
+            try? await self.urlMigrationService.migrateURLsToCloudKit()
         }
     }
 }

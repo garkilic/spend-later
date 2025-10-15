@@ -48,7 +48,7 @@ final class MonthCloseoutViewModel: ObservableObject {
                                      priceWithTax: includeTax(on: basePrice),
                                      notes: entity.notes,
                                      tags: tags,
-                                     productURL: entity.productURL,
+                                     productURL: loadURL(for: entity),
                                      imagePath: entity.imagePath,
                                      imageData: entity.imageData,
                                      status: entity.status,
@@ -65,7 +65,7 @@ final class MonthCloseoutViewModel: ObservableObject {
                                        priceWithTax: includeTax(on: winnerPrice),
                                        notes: winnerEntity.notes,
                                        tags: winnerTags,
-                                       productURL: winnerEntity.productURL,
+                                       productURL: loadURL(for: winnerEntity),
                                        imagePath: winnerEntity.imagePath,
                                        imageData: winnerEntity.imageData,
                                        status: winnerEntity.status,
@@ -130,5 +130,17 @@ final class MonthCloseoutViewModel: ObservableObject {
         let multiplier = Decimal(1) + taxRate
         result *= multiplier
         return result
+    }
+
+    private func loadURL(for item: WantedItemEntity) -> String? {
+        // Priority 1: Load from CloudKit-synced productURLData (if available)
+        if let urlData = item.productURLData,
+           let urlString = String(data: urlData, encoding: .utf8),
+           !urlString.isEmpty {
+            return urlString
+        }
+
+        // Priority 2: Fallback to local productURL string
+        return item.productURL
     }
 }

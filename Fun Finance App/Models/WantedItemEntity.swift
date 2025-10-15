@@ -9,6 +9,7 @@ final class WantedItemEntity: NSManagedObject {
     @NSManaged var notes: String?
     @NSManaged var productText: String?
     @NSManaged var productURL: String?
+    @NSManaged var productURLData: Data? // CloudKit-synced as CKAsset (external storage)
     @NSManaged var imagePath: String
     @NSManaged var imageData: Data? // CloudKit-synced as CKAsset (external storage)
     @NSManaged var tagsRaw: String?
