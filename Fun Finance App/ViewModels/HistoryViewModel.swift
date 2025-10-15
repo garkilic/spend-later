@@ -38,16 +38,10 @@ final class HistoryViewModel: ObservableObject {
     }
 
     func image(for item: WantedItemDisplay) -> UIImage? {
-        // Try imageData first (CloudKit-synced images)
-        if let imageData = item.imageData, !imageData.isEmpty {
-            return imageStore.loadImage(from: imageData)
-        }
-
-        // Fall back to file-based imagePath (legacy images)
+        // Load from file-based imagePath (local-only images)
         if !item.imagePath.isEmpty {
             return imageStore.loadImage(named: item.imagePath)
         }
-
         return nil
     }
 
@@ -207,7 +201,7 @@ private extension HistoryViewModel {
                     tags: tags,
                     productURL: entity.productURL,
                     imagePath: entity.imagePath,
-                    imageData: entity.imageData,
+                    imageData: nil, // imageData removed from schema
                     status: entity.status,
                     createdAt: entity.createdAt
                 )

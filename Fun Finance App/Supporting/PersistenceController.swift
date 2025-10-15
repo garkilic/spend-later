@@ -32,7 +32,7 @@ final class PersistenceController {
             // Check if we need to reset due to schema upgrade
             // This should ONLY happen when migrating from old v5 schema, not on every reinstall
             let schemaVersionKey = "CoreDataSchemaVersion"
-            let currentSchemaVersion = "v6_with_imageData_15KB"
+            let currentSchemaVersion = "v6_imagePath_only"
             let savedSchemaVersion = UserDefaults.standard.string(forKey: schemaVersionKey)
             let localStoreExists = FileManager.default.fileExists(atPath: storeURL.path)
 
@@ -397,15 +397,9 @@ private extension PersistenceController {
         imagePath.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(imagePath)
 
-        // v6 adds imageData for CloudKit sync
-        if version == .v6 {
-            let imageData = NSAttributeDescription()
-            imageData.name = "imageData"
-            imageData.attributeType = .binaryDataAttributeType
-            imageData.isOptional = true
-            imageData.allowsExternalBinaryDataStorage = true // Store large images externally
-            properties.append(imageData)
-        }
+        // imageData removed from v6 - causes CloudKit sync failures
+        // Images are now local-only via imagePath (which syncs the filename)
+        // Actual image files don't sync, but all item data does
 
         let createdAt = NSAttributeDescription()
         createdAt.name = "createdAt"

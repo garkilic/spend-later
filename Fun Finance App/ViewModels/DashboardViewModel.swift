@@ -93,25 +93,12 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func image(for item: WantedItemDisplay) -> UIImage? {
-        // Try imageData first (CloudKit-synced images)
-        if let imageData = item.imageData, !imageData.isEmpty {
-            let sizeKB = Double(imageData.count) / 1024.0
-            print("🖼️ Loading image from imageData (\(String(format: "%.1f", sizeKB)) KB) for item: \(item.title)")
-            if let image = imageStore.loadImage(from: imageData) {
-                print("✅ Image loaded successfully from imageData")
-                return image
-            } else {
-                print("❌ Failed to load image from imageData")
-            }
-        }
-
-        // Fall back to file-based imagePath (legacy images)
+        // Load from file-based imagePath (local-only images)
         if !item.imagePath.isEmpty {
-            print("🖼️ Loading legacy image from file: \(item.imagePath) for item: \(item.title)")
+            print("🖼️ Loading image from file: \(item.imagePath) for item: \(item.title)")
             return imageStore.loadImage(named: item.imagePath)
         }
-
-        print("⚠️ No image available for item: \(item.title) (imageData: \(item.imageData != nil), imagePath: \(item.imagePath))")
+        print("⚠️ No image available for item: \(item.title)")
         return nil
     }
 }
@@ -130,7 +117,7 @@ private extension DashboardViewModel {
                                      tags: tags,
                                      productURL: entity.productURL,
                                      imagePath: entity.imagePath,
-                                     imageData: entity.imageData,
+                                     imageData: nil, // imageData removed from schema
                                      status: entity.status,
                                      createdAt: entity.createdAt)
         }

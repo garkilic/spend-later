@@ -60,34 +60,20 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.productText = nil
         item.productURL = productURL
 
-        // Handle image storage - save to both imageData (CloudKit) and imagePath (local backup)
+        // Handle image storage - save to local file only (imagePath)
+        // imageData removed from schema - was causing CloudKit to reject entire records
         if let image {
             print("📸 Processing image for storage...")
-
-            // Save to imageData for CloudKit sync (primary storage in v6)
-            do {
-                let compressedData = try await imageStore.compressImageToData(image)
-                let sizeKB = Double(compressedData.count) / 1024.0
-                print("📸 Image compressed to \(String(format: "%.1f", sizeKB)) KB")
-                item.imageData = compressedData
-                print("✅ imageData set for CloudKit sync")
-            } catch {
-                print("❌ Failed to set imageData: \(error.localizedDescription)")
-                item.imageData = nil
-            }
-
-            // Also save to local file as backup (for offline access)
             do {
                 let filename = try await imageStore.save(image: image)
                 item.imagePath = filename
-                print("✅ Image also saved to local file: \(filename)")
+                print("✅ Image saved to local file: \(filename)")
             } catch {
-                print("⚠️ Failed to save image file: \(error.localizedDescription)")
+                print("❌ Failed to save image file: \(error.localizedDescription)")
                 item.imagePath = ""
             }
         } else {
             item.imagePath = ""
-            item.imageData = nil
             print("ℹ️ No image provided")
         }
 
@@ -201,13 +187,10 @@ final class ItemRepository: ItemRepositoryProtocol {
                 entity.imagePath = ""
             }
 
-            // Clear old imageData
-            entity.imageData = nil
-
-            // Save new image if provided (using imageData for CloudKit sync)
+            // Save new image if provided (local file only)
             if let image = image {
-                let compressedData = try await imageStore.compressImageToData(image)
-                entity.imageData = compressedData
+                let filename = try await imageStore.save(image: image)
+                entity.imagePath = filename
             }
         }
 
@@ -239,16 +222,10 @@ final class ItemRepository: ItemRepositoryProtocol {
     }
 
     func loadImage(for item: WantedItemEntity) -> UIImage? {
-        // Try imageData first (CloudKit-synced images)
-        if let imageData = item.imageData, !imageData.isEmpty {
-            return imageStore.loadImage(from: imageData)
-        }
-
-        // Fall back to file-based imagePath (legacy images)
+        // Load from file-based imagePath (local-only images)
         if !item.imagePath.isEmpty {
             return imageStore.loadImage(named: item.imagePath)
         }
-
         return nil
     }
 }
