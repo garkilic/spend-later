@@ -93,11 +93,20 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func image(for item: WantedItemDisplay) -> UIImage? {
-        // Load from file-based imagePath (local-only images)
+        // Priority 1: Load from CloudKit-synced imageData
+        if let imageData = item.imageData {
+            print("🖼️ Loading image from imageData (CloudKit) for item: \(item.title)")
+            if let image = imageStore.loadImage(from: imageData) {
+                return image
+            }
+        }
+
+        // Priority 2: Fallback to local file imagePath
         if !item.imagePath.isEmpty {
             print("🖼️ Loading image from file: \(item.imagePath) for item: \(item.title)")
             return imageStore.loadImage(named: item.imagePath)
         }
+
         print("⚠️ No image available for item: \(item.title)")
         return nil
     }
@@ -117,6 +126,7 @@ private extension DashboardViewModel {
                                      tags: tags,
                                      productURL: entity.productURL,
                                      imagePath: entity.imagePath,
+                                     imageData: entity.imageData,
                                      status: entity.status,
                                      createdAt: entity.createdAt)
         }
@@ -166,6 +176,7 @@ private extension DashboardViewModel {
                                          tags: snapshot.tags,
                                          productURL: snapshot.productURL,
                                          imagePath: snapshot.imagePath,
+                                         imageData: nil, // Snapshots don't preserve imageData for undo
                                          status: snapshot.status,
                                          createdAt: snapshot.createdAt)
         pendingUndoItem = display

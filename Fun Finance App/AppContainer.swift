@@ -37,10 +37,10 @@ final class AppContainer: ObservableObject {
             passcodeManager.setActiveKey(settings.passcodeKeychainKey)
         }
 
-        // Image migration disabled - imageData removed from schema
-        // Images are now stored locally via imagePath only
-        // Task.detached(priority: .utility) {
-        //     try? await self.imageMigrationService.migrateImagesToCloudKit()
-        // }
+        // Run image migration in background (one-time operation)
+        // Migrates existing local images to imageData for CloudKit sync
+        Task.detached(priority: .utility) {
+            try? await self.imageMigrationService.migrateImagesToCloudKit()
+        }
     }
 }

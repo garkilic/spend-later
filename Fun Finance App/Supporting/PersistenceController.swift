@@ -32,7 +32,7 @@ final class PersistenceController {
             // Check if we need to reset due to schema upgrade
             // This should ONLY happen when migrating from old v5 schema, not on every reinstall
             let schemaVersionKey = "CoreDataSchemaVersion"
-            let currentSchemaVersion = "v6_imagePath_only"
+            let currentSchemaVersion = "v7_imageData_cloudkit_asset"
             let savedSchemaVersion = UserDefaults.standard.string(forKey: schemaVersionKey)
             let localStoreExists = FileManager.default.fileExists(atPath: storeURL.path)
 
@@ -87,7 +87,7 @@ final class PersistenceController {
                 print("🔧 CloudKit Environment: DEVELOPMENT (Debug build)")
                 #else
                 print("🚀 CloudKit Environment: PRODUCTION (Release/TestFlight build)")
-                print("⚠️ IMPORTANT: Production CloudKit must have v6 schema deployed!")
+                print("⚠️ IMPORTANT: Production CloudKit must have v7 schema deployed!")
                 print("⚠️ If sync fails, deploy schema from Development to Production in CloudKit Dashboard")
                 #endif
 
@@ -288,12 +288,12 @@ private enum ModelVersion: String {
     case v3 = "SpendLaterModelV3"
     case v4 = "SpendLaterModelV4"
     case v5 = "SpendLaterModelV5" // CloudKit-compatible model
-    case v6 = "SpendLaterModelV6" // Added imageData for CloudKit image sync
+    case v6 = "SpendLaterModelV6" // Removed imageData - caused sync issues
+    case v7 = "SpendLaterModelV7" // Re-added imageData with CloudKit Asset support
 
     static var current: ModelVersion {
-        // Use v6 in all environments - includes imageData for CloudKit image sync
-        // The v6 schema has been deployed to both Development and Production
-        return .v6
+        // Use v7 - includes imageData with external storage for CloudKit Assets
+        return .v7
     }
 }
 
@@ -369,7 +369,7 @@ private extension PersistenceController {
             properties.append(productURL)
         }
 
-        if version == .v3 || version == .v4 || version == .v5 || version == .v6 {
+        if version == .v3 || version == .v4 || version == .v5 || version == .v6 || version == .v7 {
             let tagsRaw = NSAttributeDescription()
             tagsRaw.name = "tagsRaw"
             tagsRaw.attributeType = .stringAttributeType
@@ -377,7 +377,7 @@ private extension PersistenceController {
             properties.append(tagsRaw)
         }
 
-        if version == .v4 || version == .v5 || version == .v6 {
+        if version == .v4 || version == .v5 || version == .v6 || version == .v7 {
             let actuallyPurchased = NSAttributeDescription()
             actuallyPurchased.name = "actuallyPurchased"
             actuallyPurchased.attributeType = .booleanAttributeType
@@ -393,9 +393,15 @@ private extension PersistenceController {
         imagePath.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(imagePath)
 
-        // imageData removed from v6 - causes CloudKit sync failures
-        // Images are now local-only via imagePath (which syncs the filename)
-        // Actual image files don't sync, but all item data does
+        // v7: Add imageData with CloudKit Asset support
+        if version == .v7 {
+            let imageData = NSAttributeDescription()
+            imageData.name = "imageData"
+            imageData.attributeType = .binaryDataAttributeType
+            imageData.isOptional = true // Optional so items without images can still sync
+            imageData.allowsExternalBinaryDataStorage = true // Store externally - CloudKit converts to CKAsset
+            properties.append(imageData)
+        }
 
         let createdAt = NSAttributeDescription()
         createdAt.name = "createdAt"

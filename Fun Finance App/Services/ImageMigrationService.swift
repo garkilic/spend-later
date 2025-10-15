@@ -14,12 +14,69 @@ final class ImageMigrationService {
 
     /// Migrates all legacy file-based images to imageData for CloudKit sync
     /// This is safe to run multiple times - it only processes items that need migration
-    /// NOTE: Disabled - imageData removed from schema as it caused CloudKit sync failures
     func migrateImagesToCloudKit() async throws {
-        // Migration disabled - imageData removed from Core Data schema
-        // Images are now stored locally via imagePath only
-        print("⚠️ Image migration to CloudKit is disabled (imageData removed from schema)")
-        return
+        let migrationKey = "HasMigratedImagesToCloudKit_v7"
+
+        // Check if migration has already been completed
+        if UserDefaults.standard.bool(forKey: migrationKey) {
+            print("✅ Image migration already completed")
+            return
+        }
+
+        print("🔄 Starting image migration to CloudKit...")
+
+        // Fetch all items with imagePath but no imageData
+        let request = NSFetchRequest<WantedItemEntity>(entityName: "WantedItem")
+        request.predicate = NSPredicate(format: "imagePath != '' AND imageData == nil")
+
+        let items = try context.fetch(request)
+
+        guard !items.isEmpty else {
+            print("✅ No images to migrate")
+            UserDefaults.standard.set(true, forKey: migrationKey)
+            return
+        }
+
+        print("📦 Found \(items.count) images to migrate")
+
+        var successCount = 0
+        var failureCount = 0
+
+        for item in items {
+            do {
+                // Load image from file
+                guard let image = imageStore.loadImage(named: item.imagePath) else {
+                    print("⚠️ Could not load image from file: \(item.imagePath)")
+                    failureCount += 1
+                    continue
+                }
+
+                // Compress and store in imageData
+                let compressedData = try await imageStore.compressImageToData(image)
+                item.imageData = compressedData
+
+                successCount += 1
+
+                // Save in batches to avoid memory issues
+                if successCount % 10 == 0 {
+                    try context.save()
+                    print("💾 Migrated \(successCount) images so far...")
+                }
+            } catch {
+                print("❌ Failed to migrate image for item \(item.id): \(error)")
+                failureCount += 1
+            }
+        }
+
+        // Final save
+        if context.hasChanges {
+            try context.save()
+        }
+
+        print("✅ Image migration complete: \(successCount) succeeded, \(failureCount) failed")
+
+        // Mark migration as complete
+        UserDefaults.standard.set(true, forKey: migrationKey)
     }
 
     /// Optional: Clean up old image files after successful migration
