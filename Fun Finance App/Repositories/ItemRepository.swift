@@ -64,12 +64,18 @@ final class ItemRepository: ItemRepositoryProtocol {
 
         // Store image in imageData for CloudKit sync (new approach)
         if let image {
+            print("📸 Compressing image for CloudKit sync...")
             let compressedData = try await imageStore.compressImageToData(image)
+            let sizeKB = Double(compressedData.count) / 1024.0
+            print("📸 Image compressed to \(String(format: "%.1f", sizeKB)) KB")
+
             item.imageData = compressedData
             item.imagePath = "" // Empty for new items using imageData
+            print("✅ imageData set on entity (size: \(compressedData.count) bytes)")
         } else {
             item.imageData = nil
             item.imagePath = ""
+            print("ℹ️ No image provided")
         }
 
         item.tags = tags
@@ -258,15 +264,27 @@ final class ItemRepository: ItemRepositoryProtocol {
 
 private extension ItemRepository {
     func saveIfNeeded() throws {
-        guard context.hasChanges else { return }
+        guard context.hasChanges else {
+            print("💾 No changes to save")
+            return
+        }
+
+        print("💾 Saving changes to Core Data...")
+        print("   Inserted: \(context.insertedObjects.count), Updated: \(context.updatedObjects.count), Deleted: \(context.deletedObjects.count)")
 
         // Ensure we're on the correct thread for this context
-        if Thread.isMainThread {
-            try context.save()
-        } else {
-            try context.performAndWait {
+        do {
+            if Thread.isMainThread {
                 try context.save()
+            } else {
+                try context.performAndWait {
+                    try context.save()
+                }
             }
+            print("✅ Core Data save successful - CloudKit will sync automatically")
+        } catch {
+            print("❌ Core Data save failed: \(error.localizedDescription)")
+            throw error
         }
     }
 }

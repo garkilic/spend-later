@@ -73,8 +73,10 @@ final class PersistenceController {
                 loadError = error
             } else {
                 print("✅ Persistent store loaded successfully")
+                print("   Store URL: \(description.url?.path ?? "unknown")")
                 if description.cloudKitContainerOptions != nil {
                     print("✅ CloudKit sync is enabled")
+                    print("   Container: \(description.cloudKitContainerOptions?.containerIdentifier ?? "unknown")")
                 } else {
                     print("ℹ️ CloudKit sync is disabled (local storage only)")
                 }
@@ -114,8 +116,32 @@ final class PersistenceController {
             queue: OperationQueue.main // Explicitly use main queue
         ) { [weak self] _ in
             guard let self else { return }
+            print("📥 CloudKit: Remote changes detected")
             // Refresh all objects to pick up remote changes - already on main queue
             self.container.viewContext.refreshAllObjects()
+        }
+
+        // Watch for CloudKit sync events to debug upload/download issues
+        NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification,
+            object: container,
+            queue: OperationQueue.main
+        ) { notification in
+            if let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey] as? NSPersistentCloudKitContainer.Event {
+                let eventType = event.type == .setup ? "Setup" : event.type == .import ? "Import" : event.type == .export ? "Export" : "Unknown"
+
+                if let error = event.error {
+                    print("❌ CloudKit \(eventType) error: \(error.localizedDescription)")
+                    if let nsError = error as NSError? {
+                        print("   Domain: \(nsError.domain), Code: \(nsError.code)")
+                        print("   UserInfo: \(nsError.userInfo)")
+                    }
+                } else if event.endDate != nil {
+                    print("✅ CloudKit \(eventType) completed successfully")
+                } else {
+                    print("🔄 CloudKit \(eventType) in progress...")
+                }
+            }
         }
     }
 }
