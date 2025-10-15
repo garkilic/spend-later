@@ -32,7 +32,7 @@ final class PersistenceController {
             // Check if we need to reset due to schema upgrade
             // This should ONLY happen when migrating from old v5 schema, not on every reinstall
             let schemaVersionKey = "CoreDataSchemaVersion"
-            let currentSchemaVersion = "v6_with_imageData"
+            let currentSchemaVersion = "v6_with_imageData_15KB"
             let savedSchemaVersion = UserDefaults.standard.string(forKey: schemaVersionKey)
             let localStoreExists = FileManager.default.fileExists(atPath: storeURL.path)
 
