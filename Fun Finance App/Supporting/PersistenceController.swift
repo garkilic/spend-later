@@ -35,24 +35,6 @@ final class PersistenceController {
                 try? FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true, attributes: nil)
             }
 
-            // Check if migration from local-only store is needed
-            let migrationKey = "HasMigratedToCloudKit"
-            let hasMigrated = UserDefaults.standard.bool(forKey: migrationKey)
-
-            if !hasMigrated && FileManager.default.fileExists(atPath: storeURL.path) {
-                // Existing local store found - need to migrate to CloudKit
-                print("⚠️ Migrating existing store to CloudKit...")
-
-                // Remove old store files to start fresh with CloudKit
-                let fileManager = FileManager.default
-                try? fileManager.removeItem(at: storeURL)
-                try? fileManager.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-shm"))
-                try? fileManager.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-wal"))
-
-                UserDefaults.standard.set(true, forKey: migrationKey)
-                print("✅ Migration complete - starting with fresh CloudKit-enabled store")
-            }
-
             let description = NSPersistentStoreDescription(url: storeURL)
 
             // Check if user is signed into iCloud
@@ -60,10 +42,11 @@ final class PersistenceController {
 
             if isSignedIntoiCloud {
                 print("✅ iCloud account detected - enabling CloudKit sync")
+                print("📦 CloudKit Container: iCloud.com.funfinance.spendlater")
 
                 // Enable CloudKit sync
                 description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
-                    containerIdentifier: "iCloud.punkproduct.Fun-Finance-App"
+                    containerIdentifier: "iCloud.com.funfinance.spendlater"
                 )
 
                 // Enable persistent history tracking - required for CloudKit sync
@@ -72,7 +55,9 @@ final class PersistenceController {
                 // Enable remote change notifications
                 description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
             } else {
-                print("⚠️ No iCloud account - CloudKit sync disabled (data will be local only)")
+                print("⚠️ No iCloud account detected")
+                print("⚠️ CloudKit sync is DISABLED - data will be LOCAL ONLY")
+                print("⚠️ User should sign in to iCloud in Settings to enable data sync")
                 // CloudKit will be disabled, app will work with local storage only
             }
 
@@ -86,6 +71,13 @@ final class PersistenceController {
         container.loadPersistentStores { description, error in
             if let error {
                 loadError = error
+            } else {
+                print("✅ Persistent store loaded successfully")
+                if description.cloudKitContainerOptions != nil {
+                    print("✅ CloudKit sync is enabled")
+                } else {
+                    print("ℹ️ CloudKit sync is disabled (local storage only)")
+                }
             }
         }
 
@@ -96,24 +88,34 @@ final class PersistenceController {
                 print("❌ Error domain: \(nsError.domain)")
                 print("❌ Error code: \(nsError.code)")
                 print("❌ Error userInfo: \(nsError.userInfo)")
+
+                // Provide specific guidance for CloudKit errors
+                if nsError.domain == "NSCloudKitErrorDomain" || nsError.code == 134400 {
+                    print("⚠️ CloudKit Configuration Issue:")
+                    print("   - Verify iCloud capability is enabled in Xcode")
+                    print("   - Ensure CloudKit container 'iCloud.com.funfinance.spendlater' exists")
+                    print("   - Check that the device is signed into iCloud")
+                    print("   - The app will attempt to continue with local storage only")
+                }
             }
             fatalError("Core Data failed to load: \(loadError.localizedDescription)")
         }
 
-        // Configure view context for CloudKit sync
+        // Configure view context for CloudKit sync (view context is on main queue by default)
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         container.viewContext.automaticallyMergesChangesFromParent = true // Required for CloudKit sync
         container.viewContext.undoManager = nil
         container.viewContext.shouldDeleteInaccessibleFaults = true
 
-        // Watch for remote changes from CloudKit
+        // Watch for remote changes from CloudKit - explicitly on main queue
         NotificationCenter.default.addObserver(
             forName: .NSPersistentStoreRemoteChange,
             object: container.persistentStoreCoordinator,
-            queue: .main
+            queue: OperationQueue.main // Explicitly use main queue
         ) { [weak self] _ in
-            // Refresh all objects to pick up remote changes
-            self?.container.viewContext.refreshAllObjects()
+            guard let self else { return }
+            // Refresh all objects to pick up remote changes - already on main queue
+            self.container.viewContext.refreshAllObjects()
         }
     }
 }
@@ -124,8 +126,9 @@ private enum ModelVersion: String {
     case v3 = "SpendLaterModelV3"
     case v4 = "SpendLaterModelV4"
     case v5 = "SpendLaterModelV5" // CloudKit-compatible model
+    case v6 = "SpendLaterModelV6" // Added imageData for CloudKit image sync
 
-    static var current: ModelVersion { .v5 }
+    static var current: ModelVersion { .v6 }
 }
 
 private extension PersistenceController {
@@ -200,7 +203,7 @@ private extension PersistenceController {
             properties.append(productURL)
         }
 
-        if version == .v3 || version == .v4 || version == .v5 {
+        if version == .v3 || version == .v4 || version == .v5 || version == .v6 {
             let tagsRaw = NSAttributeDescription()
             tagsRaw.name = "tagsRaw"
             tagsRaw.attributeType = .stringAttributeType
@@ -208,7 +211,7 @@ private extension PersistenceController {
             properties.append(tagsRaw)
         }
 
-        if version == .v4 || version == .v5 {
+        if version == .v4 || version == .v5 || version == .v6 {
             let actuallyPurchased = NSAttributeDescription()
             actuallyPurchased.name = "actuallyPurchased"
             actuallyPurchased.attributeType = .booleanAttributeType
@@ -223,6 +226,16 @@ private extension PersistenceController {
         imagePath.isOptional = false
         imagePath.defaultValue = "" // CloudKit requires default for non-optional
         properties.append(imagePath)
+
+        // v6 adds imageData for CloudKit sync
+        if version == .v6 {
+            let imageData = NSAttributeDescription()
+            imageData.name = "imageData"
+            imageData.attributeType = .binaryDataAttributeType
+            imageData.isOptional = true
+            imageData.allowsExternalBinaryDataStorage = true // Store large images externally
+            properties.append(imageData)
+        }
 
         let createdAt = NSAttributeDescription()
         createdAt.name = "createdAt"
@@ -364,6 +377,13 @@ private extension PersistenceController {
         passcodeKeychainKey.attributeType = .stringAttributeType
         passcodeKeychainKey.isOptional = true
         properties.append(passcodeKeychainKey)
+
+        let onboardingCompleted = NSAttributeDescription()
+        onboardingCompleted.name = "onboardingCompleted"
+        onboardingCompleted.attributeType = .booleanAttributeType
+        onboardingCompleted.isOptional = false
+        onboardingCompleted.defaultValue = false
+        properties.append(onboardingCompleted)
 
         return properties
     }

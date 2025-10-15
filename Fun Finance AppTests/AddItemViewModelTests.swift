@@ -2,6 +2,7 @@ import XCTest
 @testable import Fun_Finance_App
 
 final class AddItemViewModelTests: XCTestCase {
+    @MainActor
     func testSaveParsesCurrencyStringInCurrentLocale() async throws {
         let repository = MockItemRepository()
         let viewModel = AddItemViewModel(itemRepository: repository)
@@ -15,6 +16,7 @@ final class AddItemViewModelTests: XCTestCase {
         XCTAssertEqual(repository.addedItems.first?.price, Decimal(string: "4.25"))
     }
 
+    @MainActor
     func testSaveParsesDecimalUsingInjectedLocale() async throws {
         let repository = MockItemRepository()
         let locale = Locale(identifier: "de_DE")
@@ -29,6 +31,7 @@ final class AddItemViewModelTests: XCTestCase {
         XCTAssertEqual(repository.addedItems.first?.price, Decimal(string: "12.49"))
     }
 
+    @MainActor
     func testSaveRejectsInvalidPrice() async {
         let repository = MockItemRepository()
         let viewModel = AddItemViewModel(itemRepository: repository)

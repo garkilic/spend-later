@@ -6,6 +6,7 @@ protocol SettingsRepositoryProtocol {
     func updateReminderPrefs(weekly: Bool, monthly: Bool) throws
     func updateCurrencyCode(_ code: String) throws
     func updateTaxRate(_ rate: Decimal) throws
+    func updateOnboardingCompleted(_ completed: Bool) throws
 }
 
 final class SettingsRepository: SettingsRepositoryProtocol {
@@ -35,6 +36,7 @@ final class SettingsRepository: SettingsRepositoryProtocol {
         settings.passcodeEnabled = false
         settings.passcodeKeychainKey = nil
         settings.taxRate = .zero
+        settings.onboardingCompleted = false
         try context.save()
         return settings
     }
@@ -62,6 +64,12 @@ final class SettingsRepository: SettingsRepositoryProtocol {
     func updateTaxRate(_ rate: Decimal) throws {
         let settings = try loadAppSettings()
         settings.taxRate = NSDecimalNumber(decimal: rate)
+        try saveIfNeeded()
+    }
+
+    func updateOnboardingCompleted(_ completed: Bool) throws {
+        let settings = try loadAppSettings()
+        settings.onboardingCompleted = completed
         try saveIfNeeded()
     }
 }

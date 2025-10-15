@@ -30,7 +30,7 @@ class MockItemRepository: ItemRepositoryProtocol {
     }
 
     func activeItems(for monthKey: String) throws -> [WantedItemEntity] {
-        return itemsToReturn.filter { $0.status == .active }
+        return itemsToReturn.filter { $0.status == .saved }
     }
 
     func allItems() throws -> [WantedItemEntity] {

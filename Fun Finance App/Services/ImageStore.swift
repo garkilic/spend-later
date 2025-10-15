@@ -2,7 +2,9 @@ import UIKit
 
 protocol ImageStoring {
     func save(image: UIImage) async throws -> String
+    func compressImageToData(_ image: UIImage) async throws -> Data
     func loadImage(named filename: String) -> UIImage?
+    func loadImage(from data: Data) -> UIImage?
     func deleteImage(named filename: String)
 }
 
@@ -57,6 +59,29 @@ final class ImageStore: ImageStoring {
         return filename
     }
 
+    func compressImageToData(_ image: UIImage) async throws -> Data {
+        // Check if we have cached compressed data for this image
+        let cacheKey = "\(image.hash)" as NSString
+
+        if let cachedData = compressedDataCache.object(forKey: cacheKey) as Data? {
+            return cachedData
+        }
+
+        // First, preprocess the image (resize if needed) for faster compression
+        let processed = await processingQueue.process(image)
+
+        // Use the optimized (resized) image for compression
+        let data = try await processingQueue.compress(
+            image: processed.optimized,
+            targetSize: targetSizeInBytes
+        )
+
+        // Cache the compressed data
+        compressedDataCache.setObject(data as NSData, forKey: cacheKey)
+
+        return data
+    }
+
     func loadImage(named filename: String) -> UIImage? {
         guard !filename.isEmpty else { return nil }
 
@@ -73,6 +98,23 @@ final class ImageStore: ImageStoring {
 
         // Cache for future use
         imageCache.setObject(image, forKey: key)
+        return image
+    }
+
+    func loadImage(from data: Data) -> UIImage? {
+        guard !data.isEmpty else { return nil }
+
+        // Check cache using data hash
+        let cacheKey = "\(data.hashValue)" as NSString
+        if let cachedImage = imageCache.object(forKey: cacheKey) {
+            return cachedImage
+        }
+
+        // Load from data
+        guard let image = UIImage(data: data) else { return nil }
+
+        // Cache for future use
+        imageCache.setObject(image, forKey: cacheKey)
         return image
     }
 

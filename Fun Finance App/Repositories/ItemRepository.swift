@@ -19,6 +19,7 @@ protocol ItemRepositoryProtocol {
     func updateItem(id: UUID, title: String, price: Decimal?, notes: String?, tags: [String], productURL: String?, image: UIImage?, replaceImage: Bool) async throws
     func markAsBought(itemId: UUID) throws
     func markAsSaved(itemId: UUID) throws
+    func loadImage(for item: WantedItemEntity) -> UIImage?
 }
 
 struct ItemSnapshot {
@@ -53,12 +54,6 @@ final class ItemRepository: ItemRepositoryProtocol {
     }
 
     func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) async throws {
-        let filename: String
-        if let image {
-            filename = try await imageStore.save(image: image)
-        } else {
-            filename = ""
-        }
         let item = WantedItemEntity(context: context)
         item.id = UUID()
         item.title = title
@@ -66,7 +61,17 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.notes = notes
         item.productText = nil
         item.productURL = productURL
-        item.imagePath = filename
+
+        // Store image in imageData for CloudKit sync (new approach)
+        if let image {
+            let compressedData = try await imageStore.compressImageToData(image)
+            item.imageData = compressedData
+            item.imagePath = "" // Empty for new items using imageData
+        } else {
+            item.imageData = nil
+            item.imagePath = ""
+        }
+
         item.tags = tags
         item.createdAt = Date()
         item.monthKey = monthKey(for: item.createdAt)
@@ -193,17 +198,19 @@ final class ItemRepository: ItemRepositoryProtocol {
 
         // Handle image replacement
         if replaceImage {
-            // Delete old image if exists
+            // Delete old file-based image if exists
             if !entity.imagePath.isEmpty {
                 imageStore.deleteImage(named: entity.imagePath)
+                entity.imagePath = ""
             }
 
-            // Save new image if provided
+            // Clear old imageData
+            entity.imageData = nil
+
+            // Save new image if provided (using imageData for CloudKit sync)
             if let image = image {
-                let filename = try await imageStore.save(image: image)
-                entity.imagePath = filename
-            } else {
-                entity.imagePath = ""
+                let compressedData = try await imageStore.compressImageToData(image)
+                entity.imageData = compressedData
             }
         }
 
@@ -232,6 +239,20 @@ final class ItemRepository: ItemRepositoryProtocol {
 
         // Refresh the object to ensure subsequent fetches get fresh data
         context.refresh(entity, mergeChanges: false)
+    }
+
+    func loadImage(for item: WantedItemEntity) -> UIImage? {
+        // Try imageData first (CloudKit-synced images)
+        if let imageData = item.imageData, !imageData.isEmpty {
+            return imageStore.loadImage(from: imageData)
+        }
+
+        // Fall back to file-based imagePath (legacy images)
+        if !item.imagePath.isEmpty {
+            return imageStore.loadImage(named: item.imagePath)
+        }
+
+        return nil
     }
 }
 

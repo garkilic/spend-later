@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import CoreData
 
 struct AppRootView: View {
     enum Tab: Hashable {
@@ -24,7 +25,7 @@ struct AppRootView: View {
     @State private var isLocked = false
     @State private var showingAddSheet = false
     @State private var showingSettings = false
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var hasCompletedOnboarding = false
     @State private var showingOnboarding = false
     @State private var hasCheckedOnboarding = false
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore = false
@@ -159,6 +160,8 @@ struct AppRootView: View {
         .sheet(isPresented: $showingOnboarding) {
             OnboardingView {
                 hasCompletedOnboarding = true
+                // Save to CloudKit-synced AppSettings
+                try? container.settingsRepository.updateOnboardingCompleted(true)
             }
         }
         .fullScreenCover(isPresented: $isLocked) {
@@ -175,27 +178,33 @@ struct AppRootView: View {
                 }
             }
 
-            // Check onboarding first (synchronous, fast)
+            // Check onboarding and load settings (synchronous, fast)
             if !hasCheckedOnboarding {
                 hasCheckedOnboarding = true
-                if !hasCompletedOnboarding {
+                do {
+                    let settings = try container.settingsRepository.loadAppSettings()
+
+                    // Check onboarding from CloudKit-synced AppSettings
+                    hasCompletedOnboarding = settings.onboardingCompleted
+                    if !hasCompletedOnboarding {
+                        showingOnboarding = true
+                        return
+                    }
+
+                    // Load lock state
+                    passcodeViewModel.reset()
+                    if settings.passcodeEnabled {
+                        passcodeViewModel.load()
+                        isLocked = true
+                    } else {
+                        isLocked = false
+                    }
+                } catch {
+                    // On error, show onboarding to be safe
                     showingOnboarding = true
+                    isLocked = false
                     return
                 }
-            }
-
-            // Load lock state synchronously (it's fast, just reads UserDefaults)
-            do {
-                let settings = try container.settingsRepository.loadAppSettings()
-                passcodeViewModel.reset()
-                if settings.passcodeEnabled {
-                    passcodeViewModel.load()
-                    isLocked = true
-                } else {
-                    isLocked = false
-                }
-            } catch {
-                isLocked = false
             }
 
             // Only load dashboard data if not locked
@@ -214,6 +223,14 @@ struct AppRootView: View {
                 // Preload PhotoPicker framework for Record Impulse (low priority)
                 try? await Task.sleep(for: .seconds(2))
                 _ = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)) { _ in
+            // CloudKit has downloaded new data - refresh dashboard on main thread
+            DispatchQueue.main.async {
+                if !isLocked && hasCompletedOnboarding {
+                    dashboardViewModel.refresh()
+                }
             }
         }
         .onChange(of: scenePhase) { _, newValue in

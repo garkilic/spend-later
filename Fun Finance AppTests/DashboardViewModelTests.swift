@@ -110,7 +110,7 @@ final class DashboardViewModelTests: XCTestCase {
         item.tags = []
         item.createdAt = Date()
         item.monthKey = "2025,09"
-        item.status = .active
+        item.status = .saved
         return item
     }
 }

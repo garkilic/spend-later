@@ -15,6 +15,7 @@ final class AppContainer: ObservableObject {
     let rolloverService: RolloverService
     let hapticManager: HapticManager
     let cloudKitSyncMonitor: CloudKitSyncMonitor
+    let imageMigrationService: ImageMigrationService
 
     var viewContext: NSManagedObjectContext { persistenceController.container.viewContext }
 
@@ -29,10 +30,16 @@ final class AppContainer: ObservableObject {
         self.hapticManager = HapticManager.shared
         self.rolloverService = RolloverService(monthRepository: monthRepository, itemRepository: itemRepository)
         self.cloudKitSyncMonitor = CloudKitSyncMonitor(container: controller.container)
+        self.imageMigrationService = ImageMigrationService(context: controller.container.viewContext, imageStore: imageStore)
 
         // Load passcode key synchronously (fast, no I/O)
         if let settings = try? settingsRepository.loadAppSettings() {
             passcodeManager.setActiveKey(settings.passcodeKeychainKey)
+        }
+
+        // Run image migration in background (one-time operation)
+        Task.detached(priority: .utility) {
+            try? await self.imageMigrationService.migrateImagesToCloudKit()
         }
     }
 }

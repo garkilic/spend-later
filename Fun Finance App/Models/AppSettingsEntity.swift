@@ -9,4 +9,5 @@ final class AppSettingsEntity: NSManagedObject {
     @NSManaged var passcodeEnabled: Bool
     @NSManaged var passcodeKeychainKey: String?
     @NSManaged var taxRate: NSDecimalNumber
+    @NSManaged var onboardingCompleted: Bool // Syncs via CloudKit
 }

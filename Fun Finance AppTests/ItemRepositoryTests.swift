@@ -4,7 +4,7 @@ import CoreData
 @testable import Fun_Finance_App
 
 final class ItemRepositoryTests: XCTestCase {
-    func testAddItemPersistsProductURLAndImageFilename() throws {
+    func testAddItemPersistsProductURLAndImageFilename() async throws {
         let controller = PersistenceController(inMemory: true)
         let imageStore = MockImageStore()
         let repository = ItemRepository(context: controller.container.viewContext, imageStore: imageStore)
@@ -16,12 +16,12 @@ final class ItemRepositoryTests: XCTestCase {
         }
 
         let productURL = "https://example.com/item"
-        try repository.addItem(title: "Test Item",
-                               price: 9.99,
-                               notes: nil,
-                               tags: [],
-                               productURL: productURL,
-                               image: image)
+        try await repository.addItem(title: "Test Item",
+                                     price: 9.99,
+                                     notes: nil,
+                                     tags: [],
+                                     productURL: productURL,
+                                     image: image)
 
         let items = try repository.allItems()
         XCTAssertEqual(items.count, 1)
