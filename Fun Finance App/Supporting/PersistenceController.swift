@@ -30,36 +30,42 @@ final class PersistenceController {
             let storeURL = urls[0].appendingPathComponent("SpendLater.sqlite")
 
             // Check if we need to reset due to schema upgrade
+            // This should ONLY happen when migrating from old v5 schema, not on every reinstall
             let schemaVersionKey = "CoreDataSchemaVersion"
             let currentSchemaVersion = "v6_with_imageData"
             let savedSchemaVersion = UserDefaults.standard.string(forKey: schemaVersionKey)
+            let localStoreExists = FileManager.default.fileExists(atPath: storeURL.path)
 
-            if savedSchemaVersion != currentSchemaVersion {
+            // Only reset if:
+            // 1. We have a saved version that's different from current (upgrading from old version)
+            // 2. AND local store exists (we have old data to clean up)
+            // Do NOT reset on fresh installs (savedSchemaVersion == nil && !localStoreExists)
+            if savedSchemaVersion != currentSchemaVersion && localStoreExists {
                 print("🔄 Schema version changed from \(savedSchemaVersion ?? "unknown") to \(currentSchemaVersion)")
+                print("🔄 Local store exists - migrating old data")
                 print("🗑️ Resetting local store and CloudKit data to prevent conflicts...")
 
                 // Delete local SQLite files
                 let fileManager = FileManager.default
-                if fileManager.fileExists(atPath: storeURL.path) {
-                    try? fileManager.removeItem(at: storeURL)
-                    print("✅ Deleted old SQLite store")
-                }
-                if fileManager.fileExists(atPath: storeURL.appendingPathExtension("sqlite-shm").path) {
-                    try? fileManager.removeItem(at: storeURL.appendingPathExtension("sqlite-shm"))
-                }
-                if fileManager.fileExists(atPath: storeURL.appendingPathExtension("sqlite-wal").path) {
-                    try? fileManager.removeItem(at: storeURL.appendingPathExtension("sqlite-wal"))
-                }
+                try? fileManager.removeItem(at: storeURL)
+                try? fileManager.removeItem(at: storeURL.appendingPathExtension("sqlite-shm"))
+                try? fileManager.removeItem(at: storeURL.appendingPathExtension("sqlite-wal"))
+                print("✅ Deleted old SQLite store")
 
                 // Schedule CloudKit zone reset after store loads
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     self?.resetCloudKitZone()
                 }
 
-                // Mark schema as updated
-                UserDefaults.standard.set(currentSchemaVersion, forKey: schemaVersionKey)
                 print("✅ Local store reset complete")
+            } else if savedSchemaVersion != currentSchemaVersion && !localStoreExists {
+                // Fresh install - no local store, so just mark schema as current
+                // CloudKit data (if any) will sync down normally
+                print("ℹ️ Fresh install detected - skipping reset, will sync from CloudKit")
             }
+
+            // Always update schema version marker
+            UserDefaults.standard.set(currentSchemaVersion, forKey: schemaVersionKey)
 
             // Ensure directory exists
             let storeDirectory = storeURL.deletingLastPathComponent()
