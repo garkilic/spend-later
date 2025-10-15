@@ -5,8 +5,6 @@ protocol ItemRepositoryProtocol {
     var currentMonthKey: String { get }
     var context: NSManagedObjectContext { get }
     func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) async throws
-    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, cachedImageFilename: String?) throws
-    func preprocessAndCacheImage(_ image: UIImage) async throws -> String
     func items(for monthKey: String) throws -> [WantedItemEntity]
     func activeItems(for monthKey: String) throws -> [WantedItemEntity]
     func allItems() throws -> [WantedItemEntity]
@@ -83,28 +81,6 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.monthKey = monthKey(for: item.createdAt)
         item.status = .saved
         try saveIfNeeded()
-    }
-
-    func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, cachedImageFilename: String?) throws {
-        // Fast path - image already processed and saved
-        let item = WantedItemEntity(context: context)
-        item.id = UUID()
-        item.title = title
-        item.price = NSDecimalNumber(decimal: price)
-        item.notes = notes
-        item.productText = nil
-        item.productURL = productURL
-        item.imagePath = cachedImageFilename ?? ""
-        item.tags = tags
-        item.createdAt = Date()
-        item.monthKey = monthKey(for: item.createdAt)
-        item.status = .saved
-        try saveIfNeeded()
-    }
-
-    func preprocessAndCacheImage(_ image: UIImage) async throws -> String {
-        // Process and save image in background - returns filename for later use
-        return try await imageStore.save(image: image)
     }
 
     func items(for monthKey: String) throws -> [WantedItemEntity] {

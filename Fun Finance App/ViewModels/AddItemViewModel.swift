@@ -22,7 +22,7 @@ final class AddItemViewModel: ObservableObject {
     private let currencyFormatter: NumberFormatter
     private var resolvedProductURL: URL?
     private var processedImageTask: Task<Void, Never>?
-    private var cachedImageFilename: String?
+    private var cachedImageData: Data?
 
     init(itemRepository: ItemRepositoryProtocol,
          linkPreviewService: LinkPreviewServicing? = nil,
@@ -76,28 +76,16 @@ final class AddItemViewModel: ObservableObject {
             // Wait for any ongoing image processing to complete
             await processedImageTask?.value
 
-            // FAST PATH: If we have a cached filename, use synchronous save (instant)
-            if let cachedFilename = cachedImageFilename {
-                try itemRepository.addItem(
-                    title: trimmedTitle,
-                    price: price,
-                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
-                    tags: tags,
-                    productURL: productURL,
-                    cachedImageFilename: cachedFilename
-                )
-            } else {
-                // SLOW PATH: Process image during save (fallback)
-                let imageToSave = image ?? previewImage
-                try await itemRepository.addItem(
-                    title: trimmedTitle,
-                    price: price,
-                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
-                    tags: tags,
-                    productURL: productURL,
-                    image: imageToSave
-                )
-            }
+            // Always use imageData for CloudKit sync
+            let imageToSave = image ?? previewImage
+            try await itemRepository.addItem(
+                title: trimmedTitle,
+                price: price,
+                notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                tags: tags,
+                productURL: productURL,
+                image: imageToSave
+            )
 
             clear()
             return true
@@ -107,29 +95,15 @@ final class AddItemViewModel: ObservableObject {
         }
     }
 
-    /// Start processing an image in the background (non-blocking)
+    /// Set the image for the new item
     func processImage(_ image: UIImage) {
         // Cancel any existing processing
         processedImageTask?.cancel()
-        cachedImageFilename = nil
+        cachedImageData = nil
 
         self.image = image
-        self.isProcessingImage = true
-
-        // Process and save image in background without blocking UI
-        processedImageTask = Task { @MainActor in
-            do {
-                // This does all the heavy lifting (resize + compress) NOW
-                // So when user clicks Save, it's instant
-                let filename = try await itemRepository.preprocessAndCacheImage(image)
-                self.cachedImageFilename = filename
-                self.isProcessingImage = false
-            } catch {
-                // If preprocessing fails, fall back to processing during save
-                self.cachedImageFilename = nil
-                self.isProcessingImage = false
-            }
-        }
+        // No need to preprocess - imageData compression happens during save
+        self.isProcessingImage = false
     }
 
     func requestLinkPreview() async {
@@ -183,7 +157,7 @@ final class AddItemViewModel: ObservableObject {
         errorMessage = nil
         processedImageTask?.cancel()
         processedImageTask = nil
-        cachedImageFilename = nil
+        cachedImageData = nil
         isProcessingImage = false
     }
 }
