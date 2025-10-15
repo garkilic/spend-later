@@ -29,6 +29,38 @@ final class PersistenceController {
             let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             let storeURL = urls[0].appendingPathComponent("SpendLater.sqlite")
 
+            // Check if we need to reset due to schema upgrade
+            let schemaVersionKey = "CoreDataSchemaVersion"
+            let currentSchemaVersion = "v6_with_imageData"
+            let savedSchemaVersion = UserDefaults.standard.string(forKey: schemaVersionKey)
+
+            if savedSchemaVersion != currentSchemaVersion {
+                print("🔄 Schema version changed from \(savedSchemaVersion ?? "unknown") to \(currentSchemaVersion)")
+                print("🗑️ Resetting local store and CloudKit data to prevent conflicts...")
+
+                // Delete local SQLite files
+                let fileManager = FileManager.default
+                if fileManager.fileExists(atPath: storeURL.path) {
+                    try? fileManager.removeItem(at: storeURL)
+                    print("✅ Deleted old SQLite store")
+                }
+                if fileManager.fileExists(atPath: storeURL.appendingPathExtension("sqlite-shm").path) {
+                    try? fileManager.removeItem(at: storeURL.appendingPathExtension("sqlite-shm"))
+                }
+                if fileManager.fileExists(atPath: storeURL.appendingPathExtension("sqlite-wal").path) {
+                    try? fileManager.removeItem(at: storeURL.appendingPathExtension("sqlite-wal"))
+                }
+
+                // Schedule CloudKit zone reset after store loads
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.resetCloudKitZone()
+                }
+
+                // Mark schema as updated
+                UserDefaults.standard.set(currentSchemaVersion, forKey: schemaVersionKey)
+                print("✅ Local store reset complete")
+            }
+
             // Ensure directory exists
             let storeDirectory = storeURL.deletingLastPathComponent()
             if !FileManager.default.fileExists(atPath: storeDirectory.path) {
@@ -185,6 +217,64 @@ final class PersistenceController {
                 } else {
                     print("🔄 CloudKit \(eventType) in progress...")
                 }
+            }
+        }
+    }
+
+    /// Resets CloudKit zone by deleting all records to resolve conflicts from old schema
+    func resetCloudKitZone() {
+        print("🗑️ Starting CloudKit zone reset...")
+
+        Task {
+            do {
+                let container = CKContainer(identifier: "iCloud.com.funfinance.spendlater")
+                let database = container.privateCloudDatabase
+
+                // Fetch and delete all record types
+                let recordTypes = ["CD_WantedItem", "CD_MonthSummary", "CD_AppSettings"]
+
+                for recordType in recordTypes {
+                    print("🔍 Fetching \(recordType) records...")
+                    let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
+
+                    do {
+                        let (matchResults, _) = try await database.records(matching: query)
+
+                        var recordIDsToDelete: [CKRecord.ID] = []
+                        for (recordID, result) in matchResults {
+                            switch result {
+                            case .success:
+                                recordIDsToDelete.append(recordID)
+                            case .failure(let error):
+                                print("⚠️ Error fetching record \(recordID): \(error)")
+                            }
+                        }
+
+                        if !recordIDsToDelete.isEmpty {
+                            print("🗑️ Deleting \(recordIDsToDelete.count) \(recordType) records...")
+                            let (deleteResults, _) = try await database.modifyRecords(saving: [], deleting: recordIDsToDelete)
+
+                            var deletedCount = 0
+                            for (recordID, result) in deleteResults {
+                                switch result {
+                                case .success:
+                                    deletedCount += 1
+                                case .failure(let error):
+                                    print("⚠️ Error deleting record \(recordID): \(error)")
+                                }
+                            }
+                            print("✅ Deleted \(deletedCount) \(recordType) records")
+                        } else {
+                            print("ℹ️ No \(recordType) records to delete")
+                        }
+                    } catch {
+                        print("⚠️ Error processing \(recordType): \(error)")
+                    }
+                }
+
+                print("✅ CloudKit zone reset complete - ready for fresh sync")
+            } catch {
+                print("❌ CloudKit reset failed: \(error)")
             }
         }
     }
