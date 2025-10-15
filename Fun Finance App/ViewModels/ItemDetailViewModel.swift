@@ -98,6 +98,7 @@ final class ItemDetailViewModel: ObservableObject {
     func makeDisplay(from entity: WantedItemEntity) -> WantedItemDisplay {
         let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
         let basePrice = entity.price.decimalValue
+
         return WantedItemDisplay(id: entity.id,
                                  title: entity.title,
                                  price: basePrice,

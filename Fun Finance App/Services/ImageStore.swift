@@ -11,7 +11,7 @@ protocol ImageStoring {
 final class ImageStore: ImageStoring {
     private let fileManager: FileManager
     private let directoryURL: URL
-    private let targetSizeInBytes = 100_000 // 100KB for reliable CloudKit sync
+    private let targetSizeInBytes = 50_000 // 50KB for maximum CloudKit compatibility
     private var imageCache = NSCache<NSString, UIImage>()
     private var compressedDataCache = NSCache<NSString, NSData>()
     private let processingQueue = ImageProcessingQueue.shared

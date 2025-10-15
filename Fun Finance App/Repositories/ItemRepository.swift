@@ -60,19 +60,34 @@ final class ItemRepository: ItemRepositoryProtocol {
         item.productText = nil
         item.productURL = productURL
 
-        // Store image in imageData for CloudKit sync (new approach)
+        // Handle image storage - save to both imageData (CloudKit) and imagePath (local backup)
         if let image {
-            print("📸 Compressing image for CloudKit sync...")
-            let compressedData = try await imageStore.compressImageToData(image)
-            let sizeKB = Double(compressedData.count) / 1024.0
-            print("📸 Image compressed to \(String(format: "%.1f", sizeKB)) KB")
+            print("📸 Processing image for storage...")
 
-            item.imageData = compressedData
-            item.imagePath = "" // Empty for new items using imageData
-            print("✅ imageData set on entity (size: \(compressedData.count) bytes)")
+            // Save to imageData for CloudKit sync (primary storage in v6)
+            do {
+                let compressedData = try await imageStore.compressImageToData(image)
+                let sizeKB = Double(compressedData.count) / 1024.0
+                print("📸 Image compressed to \(String(format: "%.1f", sizeKB)) KB")
+                item.imageData = compressedData
+                print("✅ imageData set for CloudKit sync")
+            } catch {
+                print("❌ Failed to set imageData: \(error.localizedDescription)")
+                item.imageData = nil
+            }
+
+            // Also save to local file as backup (for offline access)
+            do {
+                let filename = try await imageStore.save(image: image)
+                item.imagePath = filename
+                print("✅ Image also saved to local file: \(filename)")
+            } catch {
+                print("⚠️ Failed to save image file: \(error.localizedDescription)")
+                item.imagePath = ""
+            }
         } else {
-            item.imageData = nil
             item.imagePath = ""
+            item.imageData = nil
             print("ℹ️ No image provided")
         }
 
@@ -258,8 +273,19 @@ private extension ItemRepository {
                 }
             }
             print("✅ Core Data save successful - CloudKit will sync automatically")
-        } catch {
+            print("   Note: CloudKit sync happens asynchronously in the background")
+            print("   Watch for 'CloudKit Export' messages to confirm upload")
+        } catch let error as NSError {
             print("❌ Core Data save failed: \(error.localizedDescription)")
+            print("   Domain: \(error.domain), Code: \(error.code)")
+            print("   UserInfo: \(error.userInfo)")
+
+            // Try to provide helpful guidance
+            if error.domain == NSCocoaErrorDomain && error.code == 134060 {
+                print("   ⚠️ This is a validation error - likely schema mismatch")
+                print("   ⚠️ Check that CloudKit Production schema matches app model")
+            }
+
             throw error
         }
     }

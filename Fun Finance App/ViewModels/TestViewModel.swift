@@ -227,6 +227,7 @@ final class TestViewModel: ObservableObject {
         items.map { entity in
             let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
             let basePrice = entity.price.decimalValue
+
             return WantedItemDisplay(id: entity.id,
                                      title: entity.title,
                                      price: basePrice,

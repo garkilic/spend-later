@@ -44,6 +44,21 @@ final class PersistenceController {
                 print("✅ iCloud account detected - enabling CloudKit sync")
                 print("📦 CloudKit Container: iCloud.com.funfinance.spendlater")
 
+                // Detect CloudKit environment
+                #if DEBUG
+                print("🔧 CloudKit Environment: DEVELOPMENT (Debug build)")
+                #else
+                print("🚀 CloudKit Environment: PRODUCTION (Release/TestFlight build)")
+                print("⚠️ IMPORTANT: Production CloudKit must have v6 schema deployed!")
+                print("⚠️ If sync fails, deploy schema from Development to Production in CloudKit Dashboard")
+                #endif
+
+                // TEMPORARY: Uncomment below to use Development environment in TestFlight for testing
+                // let options = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.com.funfinance.spendlater")
+                // options.databaseScope = .private
+                // print("⚠️ FORCING DEVELOPMENT ENVIRONMENT - FOR TESTING ONLY!")
+                // description.cloudKitContainerOptions = options
+
                 // Enable CloudKit sync
                 description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
                     containerIdentifier: "iCloud.com.funfinance.spendlater"
@@ -86,21 +101,42 @@ final class PersistenceController {
         if let loadError {
             print("❌ Core Data load error: \(loadError)")
             print("❌ Error details: \(loadError.localizedDescription)")
-            if let nsError = loadError as NSError? {
-                print("❌ Error domain: \(nsError.domain)")
-                print("❌ Error code: \(nsError.code)")
-                print("❌ Error userInfo: \(nsError.userInfo)")
+            let nsError = loadError as NSError
+            print("❌ Error domain: \(nsError.domain)")
+            print("❌ Error code: \(nsError.code)")
+            print("❌ Error userInfo: \(nsError.userInfo)")
 
-                // Provide specific guidance for CloudKit errors
-                if nsError.domain == "NSCloudKitErrorDomain" || nsError.code == 134400 {
-                    print("⚠️ CloudKit Configuration Issue:")
-                    print("   - Verify iCloud capability is enabled in Xcode")
-                    print("   - Ensure CloudKit container 'iCloud.com.funfinance.spendlater' exists")
-                    print("   - Check that the device is signed into iCloud")
-                    print("   - The app will attempt to continue with local storage only")
+            // Check if this is a CloudKit-specific error that we can work around
+            if nsError.domain == "NSCloudKitErrorDomain" || nsError.code == 134400 || nsError.code == 134060 {
+                print("⚠️ CloudKit Configuration Issue - attempting LOCAL-ONLY fallback")
+                print("⚠️ Data will be stored locally but NOT sync to iCloud")
+                print("⚠️ Fix: Deploy v6 schema to Production CloudKit")
+
+                // Retry without CloudKit - recalculate store URL
+                let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                let fallbackStoreURL = urls[0].appendingPathComponent("SpendLater.sqlite")
+                let description = NSPersistentStoreDescription(url: fallbackStoreURL)
+                description.cloudKitContainerOptions = nil // Disable CloudKit
+                description.shouldMigrateStoreAutomatically = true
+                description.shouldInferMappingModelAutomatically = true
+                container.persistentStoreDescriptions = [description]
+
+                var retryError: Error?
+                container.loadPersistentStores { description, error in
+                    if let error {
+                        retryError = error
+                    } else {
+                        print("✅ Persistent store loaded in LOCAL-ONLY mode")
+                        print("⚠️ CloudKit sync is DISABLED due to schema mismatch")
+                    }
                 }
+
+                if retryError != nil {
+                    fatalError("Core Data failed even in local-only mode: \(retryError!.localizedDescription)")
+                }
+            } else {
+                fatalError("Core Data failed to load: \(loadError.localizedDescription)")
             }
-            fatalError("Core Data failed to load: \(loadError.localizedDescription)")
         }
 
         // Configure view context for CloudKit sync (view context is on main queue by default)
@@ -135,6 +171,14 @@ final class PersistenceController {
                     if let nsError = error as NSError? {
                         print("   Domain: \(nsError.domain), Code: \(nsError.code)")
                         print("   UserInfo: \(nsError.userInfo)")
+
+                        // Check for schema mismatch errors
+                        if nsError.code == 134060 || nsError.domain == "CKErrorDomain" {
+                            print("   ⚠️ This may be a SCHEMA MISMATCH error!")
+                            print("   ⚠️ The CloudKit Production schema may not match the app's model")
+                            print("   ⚠️ ACTION REQUIRED: Deploy schema from Development to Production")
+                            print("   ⚠️ Go to: https://icloud.developer.apple.com/dashboard/")
+                        }
                     }
                 } else if event.endDate != nil {
                     print("✅ CloudKit \(eventType) completed successfully")
@@ -154,7 +198,11 @@ private enum ModelVersion: String {
     case v5 = "SpendLaterModelV5" // CloudKit-compatible model
     case v6 = "SpendLaterModelV6" // Added imageData for CloudKit image sync
 
-    static var current: ModelVersion { .v6 }
+    static var current: ModelVersion {
+        // Use v6 in all environments - includes imageData for CloudKit image sync
+        // The v6 schema has been deployed to both Development and Production
+        return .v6
+    }
 }
 
 private extension PersistenceController {

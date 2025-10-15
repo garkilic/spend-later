@@ -41,6 +41,7 @@ final class MonthCloseoutViewModel: ObservableObject {
         items = entities.map { entity in
             let tags = entity.tags.isEmpty ? (entity.productText.map { [$0] } ?? []) : entity.tags
             let basePrice = entity.price.decimalValue
+
             return WantedItemDisplay(id: entity.id,
                                      title: entity.title,
                                      price: basePrice,
@@ -57,6 +58,7 @@ final class MonthCloseoutViewModel: ObservableObject {
            let winnerEntity = entities.first(where: { $0.id == winnerId }) {
             let winnerTags = winnerEntity.tags.isEmpty ? (winnerEntity.productText.map { [$0] } ?? []) : winnerEntity.tags
             let winnerPrice = winnerEntity.price.decimalValue
+
             winner = WantedItemDisplay(id: winnerEntity.id,
                                        title: winnerEntity.title,
                                        price: winnerPrice,
