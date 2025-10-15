@@ -50,7 +50,6 @@ final class MonthCloseoutViewModel: ObservableObject {
                                      tags: tags,
                                      productURL: entity.productURL,
                                      imagePath: entity.imagePath,
-                                     imageData: nil, // imageData removed from schema
                                      status: entity.status,
                                      createdAt: entity.createdAt)
         }
@@ -67,7 +66,6 @@ final class MonthCloseoutViewModel: ObservableObject {
                                        tags: winnerTags,
                                        productURL: winnerEntity.productURL,
                                        imagePath: winnerEntity.imagePath,
-                                       imageData: nil, // imageData removed from schema
                                        status: winnerEntity.status,
                                        createdAt: winnerEntity.createdAt)
         }

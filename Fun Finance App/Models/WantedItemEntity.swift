@@ -10,7 +10,6 @@ final class WantedItemEntity: NSManagedObject {
     @NSManaged var productText: String?
     @NSManaged var productURL: String?
     @NSManaged var imagePath: String
-    @NSManaged var imageData: Data? // CloudKit-synced image data
     @NSManaged var tagsRaw: String?
     @NSManaged var createdAt: Date
     @NSManaged var monthKey: String

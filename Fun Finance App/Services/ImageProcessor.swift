@@ -17,7 +17,8 @@ final class ImageProcessor: ImageProcessing {
     private let thumbnailDimension: CGFloat = 400
 
     func preprocessImage(_ image: UIImage) async -> ProcessedImageResult {
-        return await Task.detached(priority: .userInitiated) {
+        // Run image processing on main actor to avoid Swift 6 concurrency errors
+        return await MainActor.run {
             // Create optimized version (resized for faster compression)
             let optimized = self.resize(image: image, maxDimension: self.maxDimension)
 
@@ -29,7 +30,7 @@ final class ImageProcessor: ImageProcessing {
                 optimized: optimized,
                 thumbnail: thumbnail
             )
-        }.value
+        }
     }
 
     func createThumbnail(from image: UIImage, maxDimension: CGFloat) -> UIImage? {

@@ -117,7 +117,6 @@ private extension DashboardViewModel {
                                      tags: tags,
                                      productURL: entity.productURL,
                                      imagePath: entity.imagePath,
-                                     imageData: nil, // imageData removed from schema
                                      status: entity.status,
                                      createdAt: entity.createdAt)
         }
@@ -167,7 +166,6 @@ private extension DashboardViewModel {
                                          tags: snapshot.tags,
                                          productURL: snapshot.productURL,
                                          imagePath: snapshot.imagePath,
-                                         imageData: nil, // Snapshots don't need imageData for undo
                                          status: snapshot.status,
                                          createdAt: snapshot.createdAt)
         pendingUndoItem = display

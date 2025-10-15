@@ -40,7 +40,7 @@ struct OnboardingView: View {
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
-                    .frame(height: geometry.size.height - 140)
+                    .frame(height: max(200, geometry.size.height - 140))
 
                     // Bottom button
                     Button {

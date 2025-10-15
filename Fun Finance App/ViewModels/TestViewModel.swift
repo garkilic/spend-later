@@ -236,7 +236,6 @@ final class TestViewModel: ObservableObject {
                                      tags: tags,
                                      productURL: entity.productURL,
                                      imagePath: entity.imagePath,
-                                     imageData: nil, // imageData removed from schema
                                      status: entity.status,
                                      createdAt: entity.createdAt)
         }

@@ -232,56 +232,52 @@ final class PersistenceController {
         print("🗑️ Starting CloudKit zone reset...")
 
         Task {
-            do {
-                let container = CKContainer(identifier: "iCloud.com.funfinance.spendlater")
-                let database = container.privateCloudDatabase
+            let container = CKContainer(identifier: "iCloud.com.funfinance.spendlater")
+            let database = container.privateCloudDatabase
 
-                // Fetch and delete all record types
-                let recordTypes = ["CD_WantedItem", "CD_MonthSummary", "CD_AppSettings"]
+            // Fetch and delete all record types
+            let recordTypes = ["CD_WantedItem", "CD_MonthSummary", "CD_AppSettings"]
 
-                for recordType in recordTypes {
-                    print("🔍 Fetching \(recordType) records...")
-                    let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
+            for recordType in recordTypes {
+                print("🔍 Fetching \(recordType) records...")
+                let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
 
-                    do {
-                        let (matchResults, _) = try await database.records(matching: query)
+                do {
+                    let (matchResults, _) = try await database.records(matching: query)
 
-                        var recordIDsToDelete: [CKRecord.ID] = []
-                        for (recordID, result) in matchResults {
+                    var recordIDsToDelete: [CKRecord.ID] = []
+                    for (recordID, result) in matchResults {
+                        switch result {
+                        case .success:
+                            recordIDsToDelete.append(recordID)
+                        case .failure(let error):
+                            print("⚠️ Error fetching record \(recordID): \(error)")
+                        }
+                    }
+
+                    if !recordIDsToDelete.isEmpty {
+                        print("🗑️ Deleting \(recordIDsToDelete.count) \(recordType) records...")
+                        let (deleteResults, _) = try await database.modifyRecords(saving: [], deleting: recordIDsToDelete)
+
+                        var deletedCount = 0
+                        for (recordID, result) in deleteResults {
                             switch result {
                             case .success:
-                                recordIDsToDelete.append(recordID)
+                                deletedCount += 1
                             case .failure(let error):
-                                print("⚠️ Error fetching record \(recordID): \(error)")
+                                print("⚠️ Error deleting record \(recordID): \(error)")
                             }
                         }
-
-                        if !recordIDsToDelete.isEmpty {
-                            print("🗑️ Deleting \(recordIDsToDelete.count) \(recordType) records...")
-                            let (deleteResults, _) = try await database.modifyRecords(saving: [], deleting: recordIDsToDelete)
-
-                            var deletedCount = 0
-                            for (recordID, result) in deleteResults {
-                                switch result {
-                                case .success:
-                                    deletedCount += 1
-                                case .failure(let error):
-                                    print("⚠️ Error deleting record \(recordID): \(error)")
-                                }
-                            }
-                            print("✅ Deleted \(deletedCount) \(recordType) records")
-                        } else {
-                            print("ℹ️ No \(recordType) records to delete")
-                        }
-                    } catch {
-                        print("⚠️ Error processing \(recordType): \(error)")
+                        print("✅ Deleted \(deletedCount) \(recordType) records")
+                    } else {
+                        print("ℹ️ No \(recordType) records to delete")
                     }
+                } catch {
+                    print("⚠️ Error processing \(recordType): \(error)")
                 }
-
-                print("✅ CloudKit zone reset complete - ready for fresh sync")
-            } catch {
-                print("❌ CloudKit reset failed: \(error)")
             }
+
+            print("✅ CloudKit zone reset complete - ready for fresh sync")
         }
     }
 }

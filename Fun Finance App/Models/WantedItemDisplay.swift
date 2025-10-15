@@ -9,7 +9,6 @@ struct WantedItemDisplay: Identifiable {
     let tags: [String]
     let productURL: String?
     let imagePath: String
-    let imageData: Data? // CloudKit-synced image data
     let status: ItemStatus
     let createdAt: Date
 
