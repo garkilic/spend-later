@@ -149,45 +149,62 @@ private extension DashboardView {
     }
 
     var statsRow: some View {
-        VStack(spacing: Spacing.cardSpacing) {
-            // First row
-            HStack(spacing: Spacing.cardSpacing) {
-                StatCard(
-                    icon: "flame.fill",
-                    value: "\(viewModel.itemCount)",
-                    label: "Temptations Resisted",
-                    color: .red,
-                    onTap: { selectedStat = .temptationsResisted }
-                )
+        HStack(spacing: Spacing.cardSpacing) {
+            StatCard(
+                icon: "flame.fill",
+                value: "\(viewModel.itemCount)",
+                label: "Resisted",
+                color: .red,
+                onTap: { selectedStat = .temptationsResisted }
+            )
 
-                StatCard(
-                    icon: "dollarsign.circle.fill",
-                    value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
-                    label: "Avg. Price",
-                    color: Color.successFallback,
-                    onTap: { selectedStat = .averagePrice }
-                )
-            }
+            StatCard(
+                icon: "dollarsign.circle.fill",
+                value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
+                label: "Avg. Cost",
+                color: Color.successFallback,
+                onTap: { selectedStat = .averagePrice }
+            )
 
-            // Second row
-            HStack(spacing: Spacing.cardSpacing) {
-                StatCard(
-                    icon: "hand.raised.fill",
-                    value: "\(viewModel.buyersRemorsePrevented)",
-                    label: "Regrets Prevented",
-                    color: .purple,
-                    onTap: { selectedStat = .buyersRemorse }
-                )
+            StatCard(
+                icon: "hand.raised.fill",
+                value: "\(viewModel.buyersRemorsePrevented)",
+                label: "Regrets",
+                color: .purple,
+                onTap: { selectedStat = .buyersRemorse }
+            )
 
-                StatCard(
-                    icon: "leaf.fill",
-                    value: viewModel.stats.formatCarbonFootprint(viewModel.carbonFootprintSaved),
-                    label: "CO₂ Saved",
-                    color: .green,
-                    onTap: { selectedStat = .carbonFootprint }
-                )
-            }
+            seeAllStatsCard
         }
+    }
+
+    var seeAllStatsCard: some View {
+        Button(action: {
+            HapticManager.shared.lightImpact()
+            selectedStat = .carbonFootprint // Show carbon footprint detail as "all stats"
+        }) {
+            VStack(alignment: .center, spacing: 4) {
+                Image(systemName: "chart.bar.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.accentFallback)
+
+                Spacer()
+
+                Text("All")
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.primaryFallback)
+
+                Text("Stats")
+                    .font(.caption2)
+                    .foregroundColor(Color.secondaryFallback)
+            }
+            .padding(Spacing.sm)
+            .frame(maxWidth: .infinity)
+            .frame(height: 80)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
     }
 
     var recentActivitySection: some View {
