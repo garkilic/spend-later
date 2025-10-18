@@ -20,6 +20,7 @@ struct StatDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let type: StatType
     let viewModel: DashboardViewModel
+    @State private var showingSharePreview = false
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,9 @@ struct StatDetailView: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $showingSharePreview) {
+                ShareCardPreviewView(cardType: currentCardType)
             }
         }
     }
@@ -235,22 +239,21 @@ struct StatDetailView: View {
         }
     }
 
-    private func shareCard() {
-        guard let viewController = UIApplication.shared.keyWindowPresentedController else { return }
-
-        let cardType: ShareCardType
+    private var currentCardType: ShareCardType {
         switch type {
         case .temptationsResisted:
-            cardType = .temptationsResisted(viewModel.itemCount)
+            return .temptationsResisted(viewModel.itemCount)
         case .averagePrice:
-            cardType = .averagePrice(viewModel.averageItemPrice)
+            return .averagePrice(viewModel.averageItemPrice)
         case .buyersRemorse:
-            cardType = .buyersRemorse(viewModel.buyersRemorsePrevented)
+            return .buyersRemorse(viewModel.buyersRemorsePrevented)
         case .carbonFootprint:
-            cardType = .carbonFootprint(viewModel.carbonFootprintSaved)
+            return .carbonFootprint(viewModel.carbonFootprintSaved)
         }
+    }
 
-        ShareCardRenderer.share(cardType, from: viewController)
+    private func shareCard() {
+        showingSharePreview = true
     }
 }
 

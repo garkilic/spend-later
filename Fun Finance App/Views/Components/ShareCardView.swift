@@ -104,11 +104,11 @@ enum ShareCardType {
 
     var tagline: String {
         switch self {
-        case .totalSaved: return "💪 Willpower Wins"
-        case .temptationsResisted: return "🔥 Building Stronger Habits"
-        case .averagePrice: return "💰 Money Stays In My Pocket"
-        case .buyersRemorse: return "😌 No More Buyer's Remorse"
-        case .carbonFootprint: return "🌱 Saving The Planet Too"
+        case .totalSaved: return "💪 My wallet is so proud of me right now"
+        case .temptationsResisted: return "🔥 I said no and it felt SO good"
+        case .averagePrice: return "💰 That's a lot of coffee I didn't buy"
+        case .buyersRemorse: return "😌 Future me is SO grateful"
+        case .carbonFootprint: return "🌱 Saving money AND the planet? I'm basically a superhero"
         }
     }
 
