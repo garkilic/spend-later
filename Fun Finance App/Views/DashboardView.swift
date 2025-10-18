@@ -8,6 +8,7 @@ struct DashboardView: View {
     @State private var showingAddSheet = false
     @State private var selectedItem: WantedItemDisplay?
     @State private var showingGraph = false
+    @State private var showingSavingsDetail = false
     @State private var itemToDelete: WantedItemDisplay?
     @State private var showingDeleteConfirmation = false
     @State private var showingPaywall = false
@@ -82,6 +83,9 @@ struct DashboardView: View {
             .sheet(item: $selectedStat) { statType in
                 StatDetailView(type: statType, viewModel: viewModel)
             }
+            .sheet(isPresented: $showingSavingsDetail) {
+                SavingsDetailView(viewModel: viewModel)
+            }
             .alert("Delete Item?", isPresented: $showingDeleteConfirmation, presenting: itemToDelete) { item in
                 Button("Delete", role: .destructive) {
                     viewModel.delete(item)
@@ -111,7 +115,7 @@ private extension DashboardView {
 
     var savingsHero: some View {
         Button {
-            showingGraph = true
+            showingSavingsDetail = true
             HapticManager.shared.lightImpact()
         } label: {
             heroContent
