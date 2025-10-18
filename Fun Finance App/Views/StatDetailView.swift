@@ -36,14 +36,6 @@ struct StatDetailView: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        shareCard()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
@@ -82,6 +74,26 @@ struct StatDetailView: View {
                 .font(.subheadline)
                 .foregroundColor(Color.secondaryFallback)
                 .multilineTextAlignment(.center)
+
+            // Share button
+            Button {
+                shareCard()
+                HapticManager.shared.lightImpact()
+            } label: {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.subheadline)
+                    Text("Share This Stat")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.sm)
+                .background(color)
+                .cornerRadius(CornerRadius.button)
+            }
+            .padding(.top, Spacing.xs)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.lg)

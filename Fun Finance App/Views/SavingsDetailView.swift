@@ -20,14 +20,6 @@ struct SavingsDetailView: View {
             .navigationTitle("Savings Overview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        shareCard()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
@@ -52,6 +44,26 @@ struct SavingsDetailView: View {
             Text("Saved this month")
                 .font(.subheadline)
                 .foregroundColor(Color.secondaryFallback)
+
+            // Share button
+            Button {
+                shareCard()
+                HapticManager.shared.lightImpact()
+            } label: {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.subheadline)
+                    Text("Share Your Win")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.sm)
+                .background(Color.successFallback)
+                .cornerRadius(CornerRadius.button)
+            }
+            .padding(.top, Spacing.xs)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.lg)
