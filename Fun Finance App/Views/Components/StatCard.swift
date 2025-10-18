@@ -13,30 +13,21 @@ struct StatCard: View {
             HapticManager.shared.lightImpact()
             onTap()
         }) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.title3)
+                    .font(.title2)
                     .foregroundStyle(color)
 
-                Spacer()
-
                 Text(value)
-                    .font(.system(.title3, design: .rounded))
-                    .fontWeight(.bold)
+                    .font(.system(.body, design: .rounded))
+                    .fontWeight(.semibold)
                     .monospacedDigit()
                     .foregroundColor(Color.primaryFallback)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-
-                Text(label)
-                    .font(.caption2)
-                    .foregroundColor(Color.secondaryFallback)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    .minimumScaleFactor(0.5)
             }
-            .padding(Spacing.sm)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 80)
+            .frame(maxWidth: .infinity)
+            .frame(height: 65)
             .cardStyle()
         }
         .buttonStyle(.plain)

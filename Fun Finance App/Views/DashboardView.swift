@@ -149,62 +149,43 @@ private extension DashboardView {
     }
 
     var statsRow: some View {
-        HStack(spacing: Spacing.cardSpacing) {
-            StatCard(
-                icon: "flame.fill",
-                value: "\(viewModel.itemCount)",
-                label: "Resisted",
-                color: .red,
-                onTap: { selectedStat = .temptationsResisted }
-            )
+        VStack(spacing: Spacing.cardSpacing) {
+            HStack(spacing: Spacing.cardSpacing) {
+                StatCard(
+                    icon: "flame.fill",
+                    value: "\(viewModel.itemCount)",
+                    label: "",
+                    color: .red,
+                    onTap: { selectedStat = .temptationsResisted }
+                )
 
-            StatCard(
-                icon: "dollarsign.circle.fill",
-                value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
-                label: "Avg. Cost",
-                color: Color.successFallback,
-                onTap: { selectedStat = .averagePrice }
-            )
-
-            StatCard(
-                icon: "hand.raised.fill",
-                value: "\(viewModel.buyersRemorsePrevented)",
-                label: "Regrets",
-                color: .purple,
-                onTap: { selectedStat = .buyersRemorse }
-            )
-
-            seeAllStatsCard
-        }
-    }
-
-    var seeAllStatsCard: some View {
-        Button(action: {
-            HapticManager.shared.lightImpact()
-            selectedStat = .carbonFootprint // Show carbon footprint detail as "all stats"
-        }) {
-            VStack(alignment: .center, spacing: 4) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.accentFallback)
-
-                Spacer()
-
-                Text("All")
-                    .font(.system(.title3, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundColor(Color.primaryFallback)
-
-                Text("Stats")
-                    .font(.caption2)
-                    .foregroundColor(Color.secondaryFallback)
+                StatCard(
+                    icon: "dollarsign.circle.fill",
+                    value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
+                    label: "",
+                    color: Color.successFallback,
+                    onTap: { selectedStat = .averagePrice }
+                )
             }
-            .padding(Spacing.sm)
-            .frame(maxWidth: .infinity)
-            .frame(height: 80)
-            .cardStyle()
+
+            HStack(spacing: Spacing.cardSpacing) {
+                StatCard(
+                    icon: "hand.raised.fill",
+                    value: "\(viewModel.buyersRemorsePrevented)",
+                    label: "",
+                    color: .purple,
+                    onTap: { selectedStat = .buyersRemorse }
+                )
+
+                StatCard(
+                    icon: "leaf.fill",
+                    value: viewModel.stats.formatCarbonFootprint(viewModel.carbonFootprintSaved),
+                    label: "",
+                    color: .green,
+                    onTap: { selectedStat = .carbonFootprint }
+                )
+            }
         }
-        .buttonStyle(.plain)
     }
 
     var recentActivitySection: some View {
