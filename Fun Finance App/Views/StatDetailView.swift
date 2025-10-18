@@ -36,6 +36,14 @@ struct StatDetailView: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        shareCard()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
@@ -213,6 +221,24 @@ struct StatDetailView: View {
                 "Every item saved helps the planet"
             ]
         }
+    }
+
+    private func shareCard() {
+        guard let viewController = UIApplication.shared.keyWindowPresentedController else { return }
+
+        let cardType: ShareCardType
+        switch type {
+        case .temptationsResisted:
+            cardType = .temptationsResisted(viewModel.itemCount)
+        case .averagePrice:
+            cardType = .averagePrice(viewModel.averageItemPrice)
+        case .buyersRemorse:
+            cardType = .buyersRemorse(viewModel.buyersRemorsePrevented)
+        case .carbonFootprint:
+            cardType = .carbonFootprint(viewModel.carbonFootprintSaved)
+        }
+
+        ShareCardRenderer.share(cardType, from: viewController)
     }
 }
 

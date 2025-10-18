@@ -20,6 +20,14 @@ struct SavingsDetailView: View {
             .navigationTitle("Savings Overview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        shareCard()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
@@ -209,6 +217,13 @@ struct SavingsDetailView: View {
                 .font(.body)
                 .foregroundColor(Color.primaryFallback)
         }
+    }
+
+    private func shareCard() {
+        guard let viewController = UIApplication.shared.keyWindowPresentedController else { return }
+
+        let cardType = ShareCardType.totalSaved(viewModel.totalSaved)
+        ShareCardRenderer.share(cardType, from: viewController)
     }
 }
 
