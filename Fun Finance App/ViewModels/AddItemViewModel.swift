@@ -15,9 +15,11 @@ final class AddItemViewModel: ObservableObject {
     @Published var isSaving: Bool = false
     @Published var isFetchingPreview: Bool = false
     @Published var isProcessingImage: Bool = false
+    @Published var isBlockedByCap: Bool = false
 
     private let itemRepository: ItemRepositoryProtocol
     private let linkPreviewService: LinkPreviewServicing
+    let savingsTracker: SavingsTracker
     private let decimalFormatter: NumberFormatter
     private let currencyFormatter: NumberFormatter
     private var resolvedProductURL: URL?
@@ -25,9 +27,11 @@ final class AddItemViewModel: ObservableObject {
     private var cachedImageData: Data?
 
     init(itemRepository: ItemRepositoryProtocol,
+         savingsTracker: SavingsTracker,
          linkPreviewService: LinkPreviewServicing? = nil,
          locale: Locale = .current) {
         self.itemRepository = itemRepository
+        self.savingsTracker = savingsTracker
         self.linkPreviewService = linkPreviewService ?? LinkPreviewService()
         let decimalFormatter = NumberFormatter()
         decimalFormatter.locale = locale
@@ -47,6 +51,12 @@ final class AddItemViewModel: ObservableObject {
     func save() async -> Bool {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         errorMessage = nil
+
+        // Check if blocked by savings cap
+        if !savingsTracker.canAddItems() {
+            isBlockedByCap = true
+            return false
+        }
 
         // Simple validation
         guard !trimmedTitle.isEmpty else {
@@ -86,6 +96,9 @@ final class AddItemViewModel: ObservableObject {
                 productURL: productURL,
                 image: imageToSave
             )
+
+            // Recalculate savings after adding item
+            savingsTracker.calculateTotalSavings()
 
             clear()
             return true

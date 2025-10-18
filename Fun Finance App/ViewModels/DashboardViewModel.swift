@@ -8,6 +8,8 @@ final class DashboardViewModel: ObservableObject {
     @Published var totalSaved: Decimal = .zero
     @Published var itemCount: Int = 0
     @Published var averageItemPrice: Decimal = .zero
+    @Published var buyersRemorsePrevented: Int = 0
+    @Published var carbonFootprintSaved: Double = 0.0
     @Published var pendingUndoItem: WantedItemDisplay?
     @Published var canReviewLastMonth: Bool = false
     @Published var yearlyTotals: [MonthlyTrendPoint] = []
@@ -18,6 +20,7 @@ final class DashboardViewModel: ObservableObject {
     private let monthRepository: MonthRepositoryProtocol
     private let settingsRepository: SettingsRepositoryProtocol
     private let imageStore: ImageStoring
+    private let statsCalculator = StatsCalculator()
     private var pendingDeletion: (snapshot: ItemSnapshot, workItem: DispatchWorkItem)?
     private let calendar: Calendar
     private let haptics = HapticManager.shared
@@ -110,6 +113,10 @@ final class DashboardViewModel: ObservableObject {
         print("⚠️ No image available for item: \(item.title)")
         return nil
     }
+
+    var stats: StatsCalculator {
+        statsCalculator
+    }
 }
 
 private extension DashboardViewModel {
@@ -136,6 +143,8 @@ private extension DashboardViewModel {
         let newTotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
         let newCount = displays.count
         let newAverage = newCount > 0 ? newTotal / Decimal(newCount) : .zero
+        let newRemorsePrevented = statsCalculator.buyersRemorsePrevented(itemCount: newCount)
+        let newCarbonSaved = statsCalculator.carbonFootprintSaved(itemCount: newCount)
 
         // Only update if values changed to avoid unnecessary UI updates
         if items.count != displays.count || items != displays {
@@ -149,6 +158,12 @@ private extension DashboardViewModel {
         }
         if averageItemPrice != newAverage {
             self.averageItemPrice = newAverage
+        }
+        if buyersRemorsePrevented != newRemorsePrevented {
+            self.buyersRemorsePrevented = newRemorsePrevented
+        }
+        if carbonFootprintSaved != newCarbonSaved {
+            self.carbonFootprintSaved = newCarbonSaved
         }
     }
 

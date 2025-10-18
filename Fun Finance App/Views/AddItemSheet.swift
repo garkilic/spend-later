@@ -8,6 +8,7 @@ struct AddItemSheet: View {
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var showingCamera = false
     @State private var showingPhotoSource = false
+    @State private var showingPaywall = false
     @State private var cameraError: String?
     @FocusState private var isURLFieldFocused: Bool
     @State private var lastFetchedURL: String = ""
@@ -55,8 +56,11 @@ struct AddItemSheet: View {
                     } else {
                         Button("Save") {
                             Task {
-                                if await viewModel.save() {
+                                let saved = await viewModel.save()
+                                if saved {
                                     dismiss()
+                                } else if viewModel.isBlockedByCap {
+                                    showingPaywall = true
                                 }
                             }
                         }
@@ -135,7 +139,22 @@ struct AddItemSheet: View {
                     fetchPreviewIfNeeded()
                 }
             }
+            .onChange(of: viewModel.isBlockedByCap) { _, isBlocked in
+                if isBlocked {
+                    showingPaywall = true
+                }
+            }
+            .sheet(isPresented: $showingPaywall) {
+                PaywallView(
+                    viewModel: PaywallViewModel(purchaseManager: viewModel.savingsTracker.purchaseManager),
+                    totalSaved: viewModel.savingsTracker.totalSavings
+                )
+            }
         }
+    }
+
+    private var purchaseManager: PurchaseManager {
+        viewModel.savingsTracker.purchaseManager
     }
 
     private func fetchPreviewIfNeeded() {
@@ -637,6 +656,6 @@ private struct ImageProcessingOverlay: View {
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
     let container = PreviewSupport.container
-    return AddItemSheet(viewModel: AddItemViewModel(itemRepository: container.itemRepository))
+    return AddItemSheet(viewModel: AddItemViewModel(itemRepository: container.itemRepository, savingsTracker: container.savingsTracker))
 }
 #endif

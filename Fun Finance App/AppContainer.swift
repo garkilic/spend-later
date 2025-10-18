@@ -12,6 +12,8 @@ final class AppContainer: ObservableObject {
     let monthRepository: MonthRepository
     let settingsRepository: SettingsRepository
     let passcodeManager: PasscodeManager
+    let purchaseManager: PurchaseManager
+    let savingsTracker: SavingsTracker
     let rolloverService: RolloverService
     let hapticManager: HapticManager
     let cloudKitSyncMonitor: CloudKitSyncMonitor
@@ -28,6 +30,8 @@ final class AppContainer: ObservableObject {
         self.settingsRepository = SettingsRepository(context: controller.container.viewContext)
         self.monthRepository = MonthRepository(context: controller.container.viewContext, itemRepository: itemRepository)
         self.passcodeManager = PasscodeManager()
+        self.purchaseManager = PurchaseManager()
+        self.savingsTracker = SavingsTracker(itemRepository: itemRepository, purchaseManager: purchaseManager)
         self.hapticManager = HapticManager.shared
         self.rolloverService = RolloverService(monthRepository: monthRepository, itemRepository: itemRepository)
         self.cloudKitSyncMonitor = CloudKitSyncMonitor(container: controller.container)

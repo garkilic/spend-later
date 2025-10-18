@@ -42,7 +42,8 @@ struct AppRootView: View {
             imageStore: container.imageStore))
 
         _addItemViewModel = StateObject(wrappedValue: AddItemViewModel(
-            itemRepository: container.itemRepository))
+            itemRepository: container.itemRepository,
+            savingsTracker: container.savingsTracker))
 
         _passcodeViewModel = StateObject(wrappedValue: PasscodeViewModel(
             passcodeManager: container.passcodeManager,
@@ -56,6 +57,7 @@ struct AppRootView: View {
             TabView(selection: $selectedTab) {
                 DashboardView(viewModel: dashboardViewModel,
                           addItemViewModel: addItemViewModel,
+                          savingsTracker: container.savingsTracker,
                           onOpenSettings: { showingSettings = true },
                           makeDetailViewModel: { item in
                               ItemDetailViewModel(item: item,
@@ -143,7 +145,7 @@ struct AppRootView: View {
         .sheet(isPresented: $showingSettings) {
             if let settingsVM = settingsViewModel {
                 NavigationStack {
-                    SettingsView(viewModel: settingsVM)
+                    SettingsView(viewModel: settingsVM, purchaseManager: container.purchaseManager)
                 }
             }
         }
@@ -210,6 +212,8 @@ struct AppRootView: View {
             // Only load dashboard data if not locked
             if hasCompletedOnboarding && !isLocked {
                 dashboardViewModel.refresh()
+                // Calculate savings to show warnings if needed
+                container.savingsTracker.calculateTotalSavings()
             }
 
             // Defer non-critical background work to avoid blocking UI
@@ -230,6 +234,7 @@ struct AppRootView: View {
             DispatchQueue.main.async {
                 if !isLocked && hasCompletedOnboarding {
                     dashboardViewModel.refresh()
+                    container.savingsTracker.calculateTotalSavings()
                 }
             }
         }
@@ -243,6 +248,7 @@ struct AppRootView: View {
             refreshLockState()
             if !isLocked {
                 dashboardViewModel.refresh()
+                container.savingsTracker.calculateTotalSavings()
             }
 
             // Rollover check handled by Reward tab button
@@ -254,6 +260,7 @@ struct AppRootView: View {
 
                 // Only refresh dashboard after unlocking
                 dashboardViewModel.refresh()
+                container.savingsTracker.calculateTotalSavings()
             }
         }
     }

@@ -1,0 +1,68 @@
+{
+  "identifier" : "3D8E9F12",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "6670448001",
+      "localizations" : [
+        {
+          "description" : "Unlock all premium features with a lifetime purchase",
+          "displayName" : "Premium Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.funfinance.premium.lifetime",
+      "referenceName" : "Premium Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6670448000",
+    "_developerTeamID" : "DEVTEAM123",
+    "_lastSynchronizedDate" : 752198400.0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21452386",
+      "localizations" : [
+
+      ],
+      "name" : "Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6670448002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Get unlimited access to all premium features",
+              "displayName" : "Premium Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.funfinance.premium.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium Monthly",
+          "subscriptionGroupID" : "21452386",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

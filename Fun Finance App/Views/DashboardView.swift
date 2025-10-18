@@ -4,20 +4,25 @@ struct DashboardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel: DashboardViewModel
     @StateObject private var addItemViewModel: AddItemViewModel
+    @ObservedObject var savingsTracker: SavingsTracker
     @State private var showingAddSheet = false
     @State private var selectedItem: WantedItemDisplay?
     @State private var showingGraph = false
     @State private var itemToDelete: WantedItemDisplay?
     @State private var showingDeleteConfirmation = false
+    @State private var showingPaywall = false
+    @State private var selectedStat: StatType?
     let onOpenSettings: () -> Void
     let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
 
     init(viewModel: DashboardViewModel,
          addItemViewModel: AddItemViewModel,
+         savingsTracker: SavingsTracker,
          onOpenSettings: @escaping () -> Void,
          makeDetailViewModel: @escaping (WantedItemDisplay) -> ItemDetailViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
         _addItemViewModel = StateObject(wrappedValue: addItemViewModel)
+        self.savingsTracker = savingsTracker
         self.onOpenSettings = onOpenSettings
         self.makeDetailViewModel = makeDetailViewModel
     }
@@ -30,6 +35,7 @@ struct DashboardView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Spacing.cardSpacing) {
                         savingsHero
+                        warningCard
                         statsRow
                         recentActivitySection
                     }
@@ -57,6 +63,12 @@ struct DashboardView: View {
             .sheet(isPresented: $showingAddSheet) {
                 AddItemSheet(viewModel: addItemViewModel)
             }
+            .sheet(isPresented: $showingPaywall) {
+                PaywallView(
+                    viewModel: PaywallViewModel(purchaseManager: savingsTracker.purchaseManager),
+                    totalSaved: savingsTracker.totalSavings
+                )
+            }
             .sheet(item: $selectedItem) { item in
                 detailSheet(for: item)
             }
@@ -66,6 +78,9 @@ struct DashboardView: View {
                         // Lazy load yearly data when graph is opened
                         viewModel.loadYearlyData()
                     }
+            }
+            .sheet(item: $selectedStat) { statType in
+                StatDetailView(type: statType, viewModel: viewModel)
             }
             .alert("Delete Item?", isPresented: $showingDeleteConfirmation, presenting: itemToDelete) { item in
                 Button("Delete", role: .destructive) {
@@ -134,62 +149,45 @@ private extension DashboardView {
     }
 
     var statsRow: some View {
-        HStack(spacing: Spacing.cardSpacing) {
-            statCard(
-                icon: "flame.fill",
-                title: "",
-                value: "\(viewModel.itemCount)",
-                subtitle: "impulses resisted",
-                color: .red
-            )
+        VStack(spacing: Spacing.cardSpacing) {
+            // First row
+            HStack(spacing: Spacing.cardSpacing) {
+                StatCard(
+                    icon: "flame.fill",
+                    value: "\(viewModel.itemCount)",
+                    label: "Temptations Resisted",
+                    color: .red,
+                    onTap: { selectedStat = .temptationsResisted }
+                )
 
-            statCard(
-                icon: "dollarsign.circle.fill",
-                title: "",
-                value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
-                subtitle: "Avg. Impulse Cost",
-                color: Color.successFallback
-            )
-        }
-    }
-
-    func statCard(icon: String, title: String, value: String, subtitle: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(color)
-                Spacer()
+                StatCard(
+                    icon: "dollarsign.circle.fill",
+                    value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
+                    label: "Avg. Price",
+                    color: Color.successFallback,
+                    onTap: { selectedStat = .averagePrice }
+                )
             }
 
-            Spacer()
+            // Second row
+            HStack(spacing: Spacing.cardSpacing) {
+                StatCard(
+                    icon: "hand.raised.fill",
+                    value: "\(viewModel.buyersRemorsePrevented)",
+                    label: "Regrets Prevented",
+                    color: .purple,
+                    onTap: { selectedStat = .buyersRemorse }
+                )
 
-            if !title.isEmpty {
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(Color.secondaryFallback)
-                    .textCase(.uppercase)
+                StatCard(
+                    icon: "leaf.fill",
+                    value: viewModel.stats.formatCarbonFootprint(viewModel.carbonFootprintSaved),
+                    label: "CO₂ Saved",
+                    color: .green,
+                    onTap: { selectedStat = .carbonFootprint }
+                )
             }
-
-            Text(value)
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .monospacedDigit()
-                .foregroundColor(Color.primaryFallback)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundColor(Color.secondaryFallback)
         }
-        .padding(Spacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 120)
-        .cardStyle()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(title.isEmpty ? "\(value), \(subtitle)" : "\(title): \(value), \(subtitle)")
     }
 
     var recentActivitySection: some View {
@@ -335,6 +333,90 @@ private extension DashboardView {
         .animation(.spring, value: viewModel.pendingUndoItem != nil)
     }
 
+    @ViewBuilder
+    var warningCard: some View {
+        if savingsTracker.showWarning && !savingsTracker.purchaseManager.hasPremiumAccess {
+            HStack(alignment: .center, spacing: Spacing.sm) {
+                // Icon
+                Image(systemName: warningIcon)
+                    .font(.title3)
+                    .foregroundColor(warningColor)
+
+                // Message
+                Text(savingsTracker.warningMessage)
+                    .font(.subheadline)
+                    .foregroundColor(Color.primaryFallback)
+                    .lineLimit(2)
+
+                Spacer()
+
+                // Unlock button
+                Button {
+                    showingPaywall = true
+                    HapticManager.shared.lightImpact()
+                } label: {
+                    Text("Unlock")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.xs)
+                        .background(warningColor)
+                        .cornerRadius(CornerRadius.button)
+                }
+            }
+            .padding(Spacing.md)
+            .background(warningBackgroundColor)
+            .cornerRadius(CornerRadius.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.card)
+                    .stroke(warningBorderColor, lineWidth: 1.5)
+            )
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(.spring, value: savingsTracker.showWarning)
+        }
+    }
+
+    private var warningIcon: String {
+        if savingsTracker.isAtCap {
+            return "exclamationmark.triangle.fill"
+        } else if savingsTracker.totalSavings >= SavingsTracker.urgentThreshold {
+            return "exclamationmark.circle.fill"
+        } else {
+            return "info.circle.fill"
+        }
+    }
+
+    private var warningColor: Color {
+        if savingsTracker.isAtCap {
+            return .red
+        } else if savingsTracker.totalSavings >= SavingsTracker.urgentThreshold {
+            return .orange
+        } else {
+            return .blue
+        }
+    }
+
+    private var warningBackgroundColor: Color {
+        if savingsTracker.isAtCap {
+            return Color.red.opacity(0.1)
+        } else if savingsTracker.totalSavings >= SavingsTracker.urgentThreshold {
+            return Color.orange.opacity(0.1)
+        } else {
+            return Color.blue.opacity(0.1)
+        }
+    }
+
+    private var warningBorderColor: Color {
+        if savingsTracker.isAtCap {
+            return Color.red.opacity(0.3)
+        } else if savingsTracker.totalSavings >= SavingsTracker.urgentThreshold {
+            return Color.orange.opacity(0.3)
+        } else {
+            return Color.blue.opacity(0.3)
+        }
+    }
+
     func detailSheet(for item: WantedItemDisplay) -> some View {
         let detailViewModel = makeDetailViewModel(item)
         return NavigationStack {
@@ -368,7 +450,8 @@ private extension DashboardView {
                                          settingsRepository: container.settingsRepository,
                                          imageStore: container.imageStore)
     return DashboardView(viewModel: dashboardVM,
-                         addItemViewModel: AddItemViewModel(itemRepository: container.itemRepository),
+                         addItemViewModel: AddItemViewModel(itemRepository: container.itemRepository, savingsTracker: container.savingsTracker),
+                         savingsTracker: container.savingsTracker,
                          onOpenSettings: {},
                          makeDetailViewModel: { item in
                              ItemDetailViewModel(item: item,

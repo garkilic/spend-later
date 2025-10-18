@@ -3,16 +3,46 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel: SettingsViewModel
     @State private var showingPasscodeSheet = false
+    @State private var showingPaywall = false
     @State private var newPasscode: String = ""
     @State private var confirmPasscode: String = ""
 
-    init(viewModel: SettingsViewModel) {
+    private let purchaseManager: PurchaseManager
+
+    init(viewModel: SettingsViewModel, purchaseManager: PurchaseManager) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.purchaseManager = purchaseManager
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Premium") {
+                    if purchaseManager.hasPremiumAccess {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.appSuccess)
+                            Text("Premium Active")
+                                .foregroundColor(.appPrimary)
+                        }
+                    } else {
+                        Button {
+                            showingPaywall = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "star.circle.fill")
+                                    .foregroundColor(.appAccent)
+                                Text("Unlock Premium")
+                                    .foregroundColor(.appPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.appSecondary)
+                            }
+                        }
+                    }
+                }
+
                 Section("Passcode") {
                     Toggle("Require passcode", isOn: Binding(get: { viewModel.passcodeEnabled }, set: { handlePasscodeToggle($0) }))
                     if let error = viewModel.errorMessage {
@@ -49,6 +79,9 @@ struct SettingsView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingPaywall) {
+                PaywallView(viewModel: PaywallViewModel(purchaseManager: purchaseManager))
+            }
         }
     }
 }
@@ -81,6 +114,6 @@ private extension SettingsView {
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
     let container = PreviewSupport.container
-    return SettingsView(viewModel: SettingsViewModel(settingsRepository: container.settingsRepository, passcodeManager: container.passcodeManager))
+    return SettingsView(viewModel: SettingsViewModel(settingsRepository: container.settingsRepository, passcodeManager: container.passcodeManager), purchaseManager: container.purchaseManager)
 }
 #endif
