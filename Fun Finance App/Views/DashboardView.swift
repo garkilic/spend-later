@@ -154,7 +154,7 @@ private extension DashboardView {
                 StatCard(
                     icon: "flame.fill",
                     value: "\(viewModel.itemCount)",
-                    label: "",
+                    label: "Resisted",
                     color: .red,
                     onTap: { selectedStat = .temptationsResisted }
                 )
@@ -162,7 +162,7 @@ private extension DashboardView {
                 StatCard(
                     icon: "dollarsign.circle.fill",
                     value: CurrencyFormatter.string(from: viewModel.averageItemPrice),
-                    label: "",
+                    label: "Average",
                     color: Color.successFallback,
                     onTap: { selectedStat = .averagePrice }
                 )
@@ -172,7 +172,7 @@ private extension DashboardView {
                 StatCard(
                     icon: "hand.raised.fill",
                     value: "\(viewModel.buyersRemorsePrevented)",
-                    label: "",
+                    label: "Regrets",
                     color: .purple,
                     onTap: { selectedStat = .buyersRemorse }
                 )
@@ -180,7 +180,7 @@ private extension DashboardView {
                 StatCard(
                     icon: "leaf.fill",
                     value: viewModel.stats.formatCarbonFootprint(viewModel.carbonFootprintSaved),
-                    label: "",
+                    label: "Carbon",
                     color: .green,
                     onTap: { selectedStat = .carbonFootprint }
                 )
