@@ -1,34 +1,16 @@
 import SwiftUI
 import UIKit
 
-/// Utility for rendering ShareCardView as UIImage for sharing
+/// Simple utility for sharing stats as text
 @MainActor
 struct ShareCardRenderer {
 
-    /// Renders a ShareCardView as a UIImage
-    static func render(_ cardType: ShareCardType) -> UIImage? {
-        let cardView = ShareCardView(type: cardType)
-        let controller = UIHostingController(rootView: cardView)
-
-        // Set the size to match the ShareCardView frame
-        let targetSize = CGSize(width: 600, height: 800)
-        controller.view.bounds = CGRect(origin: .zero, size: targetSize)
-        controller.view.backgroundColor = .clear
-
-        // Render the view
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
-
-        return renderer.image { context in
-            controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
-        }
-    }
-
-    /// Presents a share sheet for the given card type
+    /// Presents a share sheet with a simple text message
     static func share(_ cardType: ShareCardType, from viewController: UIViewController) {
-        guard let image = render(cardType) else { return }
+        let message = generateShareMessage(for: cardType)
 
         let activityVC = UIActivityViewController(
-            activityItems: [image],
+            activityItems: [message],
             applicationActivities: nil
         )
 
@@ -43,6 +25,32 @@ struct ShareCardRenderer {
 
         viewController.present(activityVC, animated: true)
     }
+
+    /// Generates a simple share message
+    private static func generateShareMessage(for cardType: ShareCardType) -> String {
+        switch cardType {
+        case .totalSaved(let amount):
+            return "I've saved \(CurrencyFormatter.string(from: amount)) this month with Spend Later!"
+        case .temptationsResisted(let count):
+            return "I've resisted \(count) temptation\(count == 1 ? "" : "s") this month with Spend Later!"
+        case .averagePrice(let amount):
+            return "My average impulse purchase is \(CurrencyFormatter.string(from: amount)) - tracked with Spend Later!"
+        case .buyersRemorse(let count):
+            return "I've prevented \(count) potential regret\(count == 1 ? "" : "s") this month with Spend Later!"
+        case .carbonFootprint(let kg):
+            let formatted = kg >= 1000 ? String(format: "%.1ft", kg / 1000) : String(format: "%.0fkg", kg)
+            return "I've saved \(formatted) of CO₂ this month with Spend Later!"
+        }
+    }
+}
+
+/// Types of shareable stats
+enum ShareCardType {
+    case totalSaved(Decimal)
+    case temptationsResisted(Int)
+    case averagePrice(Decimal)
+    case buyersRemorse(Int)
+    case carbonFootprint(Double)
 }
 
 /// Helper to get the root view controller for presenting share sheet

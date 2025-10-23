@@ -66,6 +66,9 @@ struct PaywallView: View {
                 // Header
                 headerSection
 
+                // Nonprofit message
+                nonprofitSection
+
                 // Features
                 featuresSection
 
@@ -118,6 +121,40 @@ struct PaywallView: View {
             }
         }
         .padding(.top, Spacing.lg)
+    }
+
+    private var nonprofitSection: some View {
+        HStack(spacing: Spacing.md) {
+            Image(systemName: "heart.circle.fill")
+                .font(.system(size: 32))
+                .foregroundColor(.pink)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("50% goes to nonprofits")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.appPrimary)
+
+                Text("Half of every subscription supports amazing causes")
+                    .font(.subheadline)
+                    .foregroundColor(.appSecondary)
+            }
+
+            Spacer()
+        }
+        .padding(Spacing.md)
+        .background(
+            LinearGradient(
+                colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.15)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(CornerRadius.card)
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.card)
+                .stroke(Color.pink.opacity(0.3), lineWidth: 2)
+        )
     }
 
     private var featuresSection: some View {

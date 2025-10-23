@@ -24,8 +24,10 @@ struct TestView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: Spacing.cardSpacing) {
+                        // #if DEBUG
+                        // debugDateControls
+                        // #endif
                         countdownHero
-                        currentMonthCard
                     }
                     .padding(.horizontal, Spacing.sideGutter)
                     .padding(.top, Spacing.safeAreaTop)
@@ -74,11 +76,41 @@ struct TestView: View {
         }
     }
 
+    private func countdownToNextMonth() -> String {
+        #if DEBUG
+        let now = RolloverService.debugDate ?? Date()
+        #else
+        let now = Date()
+        #endif
+        let calendar = Calendar.current
+
+        // Get first day of next month
+        guard let startOfNextMonth = calendar.date(byAdding: .month, value: 1, to: now),
+              let firstDayOfNextMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: startOfNextMonth)) else {
+            return "N/A"
+        }
+
+        let components = calendar.dateComponents([.day], from: now, to: firstDayOfNextMonth)
+        guard let days = components.day else { return "N/A" }
+
+        if days > 1 {
+            return "\(days) days"
+        } else if days == 1 {
+            return "1 day"
+        } else {
+            return "< 1 day"
+        }
+    }
+
     private func updateCountdown() {
         // Check if we have a pending closeout (month ready to spin)
         guard viewModel.pendingCloseout != nil else {
             // No pending closeout - calculate time until month end
+            #if DEBUG
+            let now = RolloverService.debugDate ?? Date()
+            #else
             let now = Date()
+            #endif
             let calendar = Calendar.current
 
             // Get the last day of the current month
@@ -125,6 +157,87 @@ struct TestView: View {
 }
 
 private extension TestView {
+    #if DEBUG
+    var debugDateControls: some View {
+        VStack(spacing: Spacing.sm) {
+            Text("🔧 DEBUG: Date Override")
+                .font(.caption)
+                .foregroundColor(.orange)
+                .fontWeight(.bold)
+                .textCase(.uppercase)
+
+            HStack(spacing: Spacing.sm) {
+                Button("Oct 31, 2025") {
+                    let components = DateComponents(year: 2025, month: 10, day: 31, hour: 23, minute: 0, second: 0)
+                    RolloverService.debugDate = Calendar.current.date(from: components)
+                    viewModel.refresh()
+                    updateCountdown()
+                    HapticManager.shared.success()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+
+                Button("Nov 1, 2025") {
+                    let components = DateComponents(year: 2025, month: 11, day: 1, hour: 12, minute: 0, second: 0)
+                    RolloverService.debugDate = Calendar.current.date(from: components)
+                    viewModel.refresh()
+                    updateCountdown()
+                    HapticManager.shared.success()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+
+                Button("Reset All") {
+                    // Reset debug date
+                    RolloverService.debugDate = nil
+
+                    // Clear all test data
+                    viewModel.clearTestData()
+
+                    // Refresh UI
+                    viewModel.refresh()
+                    updateCountdown()
+                    HapticManager.shared.mediumImpact()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+            }
+            .font(.caption)
+
+            if let debugDate = RolloverService.debugDate {
+                VStack(spacing: 4) {
+                    Text("Active Date Override:")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(debugDate.formatted(date: .complete, time: .shortened))
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .fontWeight(.semibold)
+                }
+                .padding(.top, 4)
+            } else {
+                Text("Using real date")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.orange.opacity(0.15), Color.yellow.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(CornerRadius.card)
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.card)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 2)
+        )
+    }
+    #endif
+
     var backgroundGradient: some View {
         LinearGradient(
             colors: [
@@ -140,7 +253,12 @@ private extension TestView {
 
     var countdownHero: some View {
         VStack(spacing: Spacing.lg) {
-            if canSpin {
+            if let pendingCloseout = viewModel.pendingCloseout,
+               pendingCloseout.winnerItemId != nil,
+               let winner = viewModel.items.first(where: { $0.id == pendingCloseout.winnerItemId }) {
+                // Claimed reward - show winner with countdown
+                claimedRewardContent(winner: winner)
+            } else if canSpin {
                 readyToSpinContent
             } else {
                 lockedStateContent
@@ -151,6 +269,68 @@ private extension TestView {
         .overlay(heroOverlay)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(canSpin ? "Ready to spin for your reward" : "Monthly reward unlocks in \(timeRemaining)")
+    }
+
+    private func claimedRewardContent(winner: WantedItemDisplay) -> some View {
+        VStack(spacing: Spacing.lg) {
+            // Trophy header
+            VStack(spacing: Spacing.sm) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.yellow, .orange],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: .yellow.opacity(0.6), radius: 12, x: 0, y: 4)
+
+                Text("Your Reward!")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.primaryFallback)
+
+                Text("Claim this guilt-free purchase")
+                    .font(.subheadline)
+                    .foregroundColor(Color.secondaryFallback)
+            }
+
+            // Winner card
+            ItemCardView(item: winner, image: imageProvider(winner))
+                .frame(maxWidth: 320)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.yellow, .orange, .yellow],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 3
+                        )
+                )
+                .shadow(color: .yellow.opacity(0.5), radius: 16, x: 0, y: 8)
+
+            // Countdown to next spin
+            VStack(spacing: Spacing.xs) {
+                Text("Next Spin Available")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.secondaryFallback)
+                    .textCase(.uppercase)
+
+                Text(countdownToNextMonth())
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(Color.appPrimary)
+                    .monospacedDigit()
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.surfaceElevatedFallback)
+            .cornerRadius(CornerRadius.card)
+        }
+        .padding(Spacing.xl)
     }
 
     private var readyToSpinContent: some View {

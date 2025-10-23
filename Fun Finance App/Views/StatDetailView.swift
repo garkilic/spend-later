@@ -20,7 +20,6 @@ struct StatDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let type: StatType
     let viewModel: DashboardViewModel
-    @State private var showingSharePreview = false
 
     var body: some View {
         NavigationStack {
@@ -42,9 +41,6 @@ struct StatDetailView: View {
                         dismiss()
                     }
                 }
-            }
-            .sheet(isPresented: $showingSharePreview) {
-                ShareCardPreviewView(cardType: currentCardType)
             }
         }
     }
@@ -136,8 +132,6 @@ struct StatDetailView: View {
                         }
                     }
                 }
-                .padding()
-                .cardStyle()
             }
         }
     }
@@ -253,7 +247,8 @@ struct StatDetailView: View {
     }
 
     private func shareCard() {
-        showingSharePreview = true
+        guard let viewController = UIApplication.shared.keyWindowPresentedController else { return }
+        ShareCardRenderer.share(currentCardType, from: viewController)
     }
 }
 

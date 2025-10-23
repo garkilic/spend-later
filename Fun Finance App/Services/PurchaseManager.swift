@@ -5,7 +5,6 @@ import Combine
 /// Product identifiers for in-app purchases
 enum ProductIdentifier: String, CaseIterable {
     case monthlySubscription = "com.funfinance.premium.monthly"
-    case lifetimePurchase = "com.funfinance.premium.lifetime"
 
     var id: String { rawValue }
 }
@@ -45,19 +44,26 @@ final class PurchaseManager: ObservableObject {
     func loadProducts() async {
         do {
             let productIDs = ProductIdentifier.allCases.map { $0.id }
-            let storeProducts = try await Product.products(for: productIDs)
+            print("🛒 Requesting products: \(productIDs)")
 
-            // Sort products: subscription first, then lifetime
-            products = storeProducts.sorted { product1, product2 in
-                if product1.type == .autoRenewable && product2.type != .autoRenewable {
-                    return true
-                } else if product1.type != .autoRenewable && product2.type == .autoRenewable {
-                    return false
-                }
-                return product1.price > product2.price
+            let storeProducts = try await Product.products(for: productIDs)
+            print("✅ Loaded \(storeProducts.count) products from App Store")
+
+            for product in storeProducts {
+                print("  📦 \(product.id): \(product.displayName) - \(product.displayPrice)")
+            }
+
+            products = storeProducts
+
+            if products.isEmpty {
+                print("⚠️ No products loaded. Check:")
+                print("   1. Product ID matches App Store Connect: \(productIDs.first ?? "none")")
+                print("   2. StoreKit Configuration enabled in scheme")
+                print("   3. Product status is 'Ready to Submit' in App Store Connect")
             }
         } catch {
-            print("Failed to load products: \(error)")
+            print("❌ Failed to load products: \(error)")
+            print("   Error details: \(error.localizedDescription)")
         }
     }
 

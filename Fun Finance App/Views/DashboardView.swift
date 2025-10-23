@@ -338,25 +338,25 @@ private extension DashboardView {
     @ViewBuilder
     var warningCard: some View {
         if savingsTracker.showWarning && !savingsTracker.purchaseManager.hasPremiumAccess {
-            HStack(alignment: .center, spacing: Spacing.sm) {
-                // Icon
-                Image(systemName: warningIcon)
-                    .font(.title3)
-                    .foregroundColor(warningColor)
+            Button {
+                showingPaywall = true
+                HapticManager.shared.lightImpact()
+            } label: {
+                HStack(alignment: .center, spacing: Spacing.sm) {
+                    // Icon
+                    Image(systemName: warningIcon)
+                        .font(.title3)
+                        .foregroundColor(warningColor)
 
-                // Message
-                Text(savingsTracker.warningMessage)
-                    .font(.subheadline)
-                    .foregroundColor(Color.primaryFallback)
-                    .lineLimit(2)
+                    // Message
+                    Text(savingsTracker.warningMessage)
+                        .font(.subheadline)
+                        .foregroundColor(Color.primaryFallback)
+                        .lineLimit(2)
 
-                Spacer()
+                    Spacer()
 
-                // Unlock button
-                Button {
-                    showingPaywall = true
-                    HapticManager.shared.lightImpact()
-                } label: {
+                    // Unlock indicator
                     Text("Unlock")
                         .font(.subheadline)
                         .fontWeight(.semibold)
@@ -366,14 +366,15 @@ private extension DashboardView {
                         .background(warningColor)
                         .cornerRadius(CornerRadius.button)
                 }
+                .padding(Spacing.md)
+                .background(warningBackgroundColor)
+                .cornerRadius(CornerRadius.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: CornerRadius.card)
+                        .stroke(warningBorderColor, lineWidth: 1.5)
+                )
             }
-            .padding(Spacing.md)
-            .background(warningBackgroundColor)
-            .cornerRadius(CornerRadius.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: CornerRadius.card)
-                    .stroke(warningBorderColor, lineWidth: 1.5)
-            )
+            .buttonStyle(.plain)
             .transition(.move(edge: .top).combined(with: .opacity))
             .animation(.spring, value: savingsTracker.showWarning)
         }

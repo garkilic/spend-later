@@ -60,6 +60,34 @@ final class TestViewModel: ObservableObject {
         }
     }
 
+    func clearTestData() {
+        do {
+            let context = itemRepository.context
+
+            // Delete all month summaries
+            let summaryRequest = NSFetchRequest<MonthSummaryEntity>(entityName: "MonthSummary")
+            let summaries = try context.fetch(summaryRequest)
+            for summary in summaries {
+                context.delete(summary)
+            }
+
+            // Delete all items
+            let itemRequest = NSFetchRequest<WantedItemEntity>(entityName: "WantedItem")
+            let items = try context.fetch(itemRequest)
+            for item in items {
+                context.delete(item)
+            }
+
+            if context.hasChanges {
+                try context.save()
+            }
+
+            print("🧹 Reset complete - all data cleared")
+        } catch {
+            print("❌ Reset failed: \(error)")
+        }
+    }
+
     func createTestSummary() {
         do {
             let monthKey = itemRepository.currentMonthKey

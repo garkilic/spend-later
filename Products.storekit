@@ -4,21 +4,7 @@
 
   ],
   "products" : [
-    {
-      "displayPrice" : "4.99",
-      "familyShareable" : false,
-      "internalID" : "6670448001",
-      "localizations" : [
-        {
-          "description" : "Unlock all premium features with a lifetime purchase",
-          "displayName" : "Premium Lifetime",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "com.funfinance.premium.lifetime",
-      "referenceName" : "Premium Lifetime",
-      "type" : "NonConsumable"
-    }
+
   ],
   "settings" : {
     "_applicationInternalID" : "6670448000",

@@ -5,6 +5,11 @@ final class RolloverService {
     private let itemRepository: ItemRepositoryProtocol
     private let calendar: Calendar
 
+    #if DEBUG
+    /// Debug override for testing - set to a specific date to simulate that date
+    static var debugDate: Date?
+    #endif
+
     init(monthRepository: MonthRepositoryProtocol,
          itemRepository: ItemRepositoryProtocol,
          calendar: Calendar = .current) {
@@ -13,13 +18,38 @@ final class RolloverService {
         self.calendar = calendar
     }
 
-    func evaluateIfNeeded(at date: Date = Date()) throws -> MonthSummaryEntity? {
+    private func effectiveDate(from date: Date?) -> Date {
+        #if DEBUG
+        if let override = Self.debugDate {
+            return override
+        }
+        #endif
+        return date ?? Date()
+    }
+
+    func evaluateIfNeeded(at date: Date? = nil) throws -> MonthSummaryEntity? {
+        let workingDate = effectiveDate(from: date)
         // Check if we're in the claim window (last day of month -> 5th of next month)
-        guard isInClaimWindow(date: date) else { return nil }
+        guard isInClaimWindow(date: workingDate) else { return nil }
 
         // Get the month key based on where we are in the claim window
-        let monthKey = monthKeyForClaimWindow(date: date)
-        guard let summary = try monthRepository.summary(for: monthKey) else { return nil }
+        let monthKey = monthKeyForClaimWindow(date: workingDate)
+
+        // Try to get existing summary
+        var summary = try monthRepository.summary(for: monthKey)
+
+        // If no summary exists, auto-create it if we have items
+        if summary == nil {
+            let items = try itemRepository.items(for: monthKey)
+            if !items.isEmpty {
+                // Auto-create summary for the month
+                summary = try monthRepository.createSummary(for: monthKey)
+                print("📊 Auto-created summary for \(monthKey) with \(items.count) items")
+            }
+        }
+
+        // Return nil if still no summary
+        guard let summary = summary else { return nil }
 
         // Show if winner not yet selected
         guard summary.winnerItemId == nil else { return nil }
@@ -28,10 +58,11 @@ final class RolloverService {
     }
 
     /// Returns the number of days remaining in the claim window, or nil if not in window
-    func daysRemainingInWindow(at date: Date = Date()) -> Int? {
-        guard isInClaimWindow(date: date) else { return nil }
+    func daysRemainingInWindow(at date: Date? = nil) -> Int? {
+        let workingDate = effectiveDate(from: date)
+        guard isInClaimWindow(date: workingDate) else { return nil }
 
-        let components = calendar.dateComponents([.day], from: date)
+        let components = calendar.dateComponents([.day], from: workingDate)
         guard let day = components.day else { return nil }
 
         // If we're on 1st-5th, count down to 5th
@@ -40,7 +71,7 @@ final class RolloverService {
         }
 
         // If we're on last day of month, we have 6 more days (rest of today + 1st-5th)
-        guard let range = calendar.range(of: .day, in: .month, for: date) else { return nil }
+        guard let range = calendar.range(of: .day, in: .month, for: workingDate) else { return nil }
         let lastDay = range.upperBound - 1
         if day == lastDay {
             return 6  // Last day + 5 days in next month

@@ -44,7 +44,11 @@ struct MonthCloseoutView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if showWinner {
-                        Button("Done") { dismiss() }
+                        Button {
+                            shareWinner()
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
                     }
                 }
             }
@@ -249,8 +253,62 @@ private extension MonthCloseoutView {
             .padding(.horizontal, Spacing.lg)
 
             Spacer()
+
+            // Action buttons
+            VStack(spacing: Spacing.md) {
+                Button {
+                    // Claim the reward
+                    dismiss()
+                    HapticManager.shared.success()
+                } label: {
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                        Text("Claim Reward")
+                            .font(.headline)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        LinearGradient(
+                            colors: [.orange, .yellow],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: .orange.opacity(0.4), radius: 12, x: 0, y: 6)
+                }
+                .scaleEffect(showWinner ? 1.0 : 0.8)
+                .opacity(showWinner ? 1.0 : 0.0)
+                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.8), value: showWinner)
+            }
+            .padding(.horizontal, Spacing.xl)
+            .padding(.bottom, Spacing.lg)
         }
         .padding(Spacing.xl)
+    }
+
+    func shareWinner() {
+        guard let winner = viewModel.winner else { return }
+        let message = "I won \(winner.title) (\(CurrencyFormatter.string(from: winner.priceWithTax))) in my monthly Spend Later spin! 🎉"
+
+        guard let viewController = UIApplication.shared.keyWindowPresentedController else { return }
+        let activityVC = UIActivityViewController(
+            activityItems: [message],
+            applicationActivities: nil
+        )
+
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = viewController.view
+            popover.sourceRect = CGRect(x: viewController.view.bounds.midX,
+                                       y: viewController.view.bounds.midY,
+                                       width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+
+        viewController.present(activityVC, animated: true)
     }
 
     func startSpin() {

@@ -6,6 +6,7 @@ protocol MonthRepositoryProtocol {
     func summaries() throws -> [MonthSummaryEntity]
     func summary(for monthKey: String) throws -> MonthSummaryEntity?
     func summary(with id: UUID) throws -> MonthSummaryEntity?
+    func deleteSummary(_ summary: MonthSummaryEntity) throws
 }
 
 final class MonthRepository: MonthRepositoryProtocol {
@@ -51,6 +52,13 @@ final class MonthRepository: MonthRepositoryProtocol {
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         request.fetchLimit = 1
         return try context.fetch(request).first
+    }
+
+    func deleteSummary(_ summary: MonthSummaryEntity) throws {
+        context.delete(summary)
+        if context.hasChanges {
+            try context.save()
+        }
     }
 }
 

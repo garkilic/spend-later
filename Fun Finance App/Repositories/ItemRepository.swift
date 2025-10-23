@@ -49,7 +49,12 @@ final class ItemRepository: ItemRepositoryProtocol {
     }
 
     var currentMonthKey: String {
-        monthKey(for: Date())
+        #if DEBUG
+        let date = RolloverService.debugDate ?? Date()
+        #else
+        let date = Date()
+        #endif
+        return monthKey(for: date)
     }
 
     func addItem(title: String, price: Decimal, notes: String?, tags: [String], productURL: String?, image: UIImage?) async throws {
@@ -96,7 +101,11 @@ final class ItemRepository: ItemRepositoryProtocol {
         }
 
         item.tags = tags
+        #if DEBUG
+        item.createdAt = RolloverService.debugDate ?? Date()
+        #else
         item.createdAt = Date()
+        #endif
         item.monthKey = monthKey(for: item.createdAt)
         item.status = .saved
         try saveIfNeeded()

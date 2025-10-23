@@ -3,7 +3,6 @@ import SwiftUI
 struct SavingsDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let viewModel: DashboardViewModel
-    @State private var showingSharePreview = false
 
     var body: some View {
         NavigationStack {
@@ -26,9 +25,6 @@ struct SavingsDetailView: View {
                         dismiss()
                     }
                 }
-            }
-            .sheet(isPresented: $showingSharePreview) {
-                ShareCardPreviewView(cardType: .totalSaved(viewModel.totalSaved))
             }
         }
     }
@@ -168,8 +164,6 @@ struct SavingsDetailView: View {
                 tipRow(tip: "Celebrate small victories along the way")
                 tipRow(tip: "Use saved money for meaningful goals")
             }
-            .padding()
-            .cardStyle()
         }
     }
 
@@ -236,7 +230,8 @@ struct SavingsDetailView: View {
     }
 
     private func shareCard() {
-        showingSharePreview = true
+        guard let viewController = UIApplication.shared.keyWindowPresentedController else { return }
+        ShareCardRenderer.share(.totalSaved(viewModel.totalSaved), from: viewController)
     }
 }
 
