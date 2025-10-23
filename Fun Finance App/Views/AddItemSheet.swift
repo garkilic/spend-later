@@ -59,9 +59,8 @@ struct AddItemSheet: View {
                                 let saved = await viewModel.save()
                                 if saved {
                                     dismiss()
-                                } else if viewModel.isBlockedByCap {
-                                    showingPaywall = true
                                 }
+                                // Removed paywall logic for non-monetization version
                             }
                         }
                         .disabled(!canSave || viewModel.isFetchingPreview)
@@ -139,22 +138,8 @@ struct AddItemSheet: View {
                     fetchPreviewIfNeeded()
                 }
             }
-            .onChange(of: viewModel.isBlockedByCap) { _, isBlocked in
-                if isBlocked {
-                    showingPaywall = true
-                }
-            }
-            .sheet(isPresented: $showingPaywall) {
-                PaywallView(
-                    viewModel: PaywallViewModel(purchaseManager: viewModel.savingsTracker.purchaseManager),
-                    totalSaved: viewModel.savingsTracker.totalSavings
-                )
-            }
+            // Removed paywall sheet for non-monetization version
         }
-    }
-
-    private var purchaseManager: PurchaseManager {
-        viewModel.savingsTracker.purchaseManager
     }
 
     private func fetchPreviewIfNeeded() {

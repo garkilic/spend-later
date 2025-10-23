@@ -40,13 +40,8 @@ final class SavingsTracker: ObservableObject {
 
     /// Check if user can add new items (returns true if allowed, false if blocked)
     func canAddItems() -> Bool {
-        // Premium users can always add items
-        if purchaseManager.hasPremiumAccess {
-            return true
-        }
-
-        // Free users are blocked at cap
-        return !isAtCap
+        // No monetization - all users can add unlimited items
+        return true
     }
 
     /// Get progress toward the cap (0.0 to 1.0)
@@ -65,39 +60,10 @@ final class SavingsTracker: ObservableObject {
     // MARK: - Private Methods
 
     private func updateStatus() {
-        // Premium users never hit the cap
-        if purchaseManager.hasPremiumAccess {
-            isAtCap = false
-            showWarning = false
-            warningMessage = ""
-            return
-        }
-
-        // Check if at cap
-        isAtCap = totalSavings >= Self.freeTierCap
-
-        // Determine warning level
-        if totalSavings >= Self.freeTierCap {
-            showWarning = true
-            isAtCap = true
-            let overage = totalSavings - Self.freeTierCap
-            if overage > 0 {
-                warningMessage = "You're $\(formatAmount(overage)) over the free limit. Upgrade to continue tracking."
-            } else {
-                warningMessage = "You've hit the free limit. Upgrade to continue tracking."
-            }
-        } else if totalSavings >= Self.urgentThreshold {
-            showWarning = true
-            let remaining = Self.freeTierCap - totalSavings
-            warningMessage = "$\(formatAmount(remaining)) left before hitting the free limit"
-        } else if totalSavings >= Self.warningThreshold {
-            showWarning = true
-            let remaining = Self.freeTierCap - totalSavings
-            warningMessage = "$\(formatAmount(remaining)) left in your free tier"
-        } else {
-            showWarning = false
-            warningMessage = ""
-        }
+        // No monetization - never show warnings or caps
+        isAtCap = false
+        showWarning = false
+        warningMessage = ""
     }
 
     private func formatAmount(_ amount: Decimal) -> String {

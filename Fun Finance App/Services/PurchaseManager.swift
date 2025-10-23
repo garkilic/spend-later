@@ -97,7 +97,8 @@ final class PurchaseManager: ObservableObject {
 
     /// Check if user has premium access
     var hasPremiumAccess: Bool {
-        entitlementStatus == .active
+        // No monetization - everyone has premium access
+        return true
     }
 
     // MARK: - Private Methods
