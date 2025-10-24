@@ -80,6 +80,9 @@ struct AppRootView: View {
                             },
                             onItemDeleted: { _ in
                                 dashboardViewModel.refresh()
+                            },
+                            onItemUpdated: { _ in
+                                dashboardViewModel.refresh()
                             })
                     .tabItem { Label("History", systemImage: "clock") }
                     .tag(Tab.history)
@@ -118,6 +121,10 @@ struct AppRootView: View {
 
                 // Lazy load ViewModels and data when first accessed
                 switch newValue {
+                case .dashboard:
+                    // Refresh dashboard when switching to it to ensure totals are up-to-date
+                    // (e.g., after marking items as bought in history)
+                    dashboardViewModel.refresh()
                 case .history:
                     if historyViewModel == nil {
                         historyViewModel = HistoryViewModel(

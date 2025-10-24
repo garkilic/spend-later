@@ -43,15 +43,26 @@ final class DashboardViewModel: ObservableObject {
             errorMessage = nil
             try reloadTaxRate()
             let items = try itemRepository.items(for: itemRepository.currentMonthKey)
-            // Filter to only show saved items on dashboard
+
+            // Show both saved and bought items in Recent Activity
+            // Filter out only won items (they appear in the reward/spin tab)
             let savedItems = items.filter { $0.status == .saved }
-            let displays = makeDisplays(from: savedItems)
-            apply(displays: displays)
+            let boughtItems = items.filter { $0.status == .bought }
+            let recentActivityItems = savedItems + boughtItems
+
+            // Create displays for each category
+            let allDisplays = makeDisplays(from: recentActivityItems)
+            let savedDisplays = makeDisplays(from: savedItems)
+            let boughtDisplays = makeDisplays(from: boughtItems)
+            let boughtTotal = boughtDisplays.reduce(.zero) { $0 + $1.priceWithTax }
+
+            // Pass both: allDisplays for Recent Activity, savedDisplays for KPIs
+            apply(allDisplays: allDisplays, savedDisplays: savedDisplays, boughtTotal: boughtTotal)
             updateReviewAvailability()
 
             // Only load yearly totals when needed (e.g., when viewing graph)
             if includeYearlyData {
-                try updateYearlyTotals(currentMonthDisplays: displays)
+                try updateYearlyTotals(currentMonthDisplays: savedDisplays)
             }
         } catch {
             errorMessage = "Failed to load items. Please try again."
@@ -139,16 +150,22 @@ private extension DashboardViewModel {
         }
     }
 
-    func apply(displays: [WantedItemDisplay]) {
-        let newTotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
-        let newCount = displays.count
-        let newAverage = newCount > 0 ? newTotal / Decimal(newCount) : .zero
+    func apply(allDisplays: [WantedItemDisplay], savedDisplays: [WantedItemDisplay], boughtTotal: Decimal = .zero) {
+        // Calculate total saved from saved items only
+        let savedTotal = savedDisplays.reduce(.zero) { $0 + $1.priceWithTax }
+        // Net savings = saved items - bought items
+        let newTotal = savedTotal - boughtTotal
+
+        // KPIs are based on SAVED items only (temptations you actually resisted)
+        let newCount = savedDisplays.count
+        let newAverage = newCount > 0 ? savedTotal / Decimal(newCount) : .zero
         let newRemorsePrevented = statsCalculator.buyersRemorsePrevented(itemCount: newCount)
         let newCarbonSaved = statsCalculator.carbonFootprintSaved(itemCount: newCount)
 
         // Only update if values changed to avoid unnecessary UI updates
-        if items.count != displays.count || items != displays {
-            self.items = displays
+        // items list shows both saved AND bought for Recent Activity
+        if items.count != allDisplays.count || items != allDisplays {
+            self.items = allDisplays
         }
         if totalSaved != newTotal {
             self.totalSaved = newTotal

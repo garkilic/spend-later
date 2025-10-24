@@ -45,10 +45,21 @@ final class TestViewModel: ObservableObject {
         do {
             taxRate = try settingsRepository.loadAppSettings().taxRate.decimalValue
             let items = try itemRepository.items(for: itemRepository.currentMonthKey)
-            let displays = makeDisplays(from: items)
+
+            // Filter to only saved items for display and counting
+            // Bought items are subtracted from savings
+            let savedItems = items.filter { $0.status == .saved }
+            let boughtItems = items.filter { $0.status == .bought }
+
+            let displays = makeDisplays(from: savedItems)
             self.items = displays
-            totalSaved = displays.reduce(.zero) { $0 + $1.priceWithTax }
             itemCount = displays.count
+
+            // Calculate total: saved - bought (matching Dashboard logic)
+            let savedTotal = displays.reduce(.zero) { $0 + $1.priceWithTax }
+            let boughtDisplays = makeDisplays(from: boughtItems)
+            let boughtTotal = boughtDisplays.reduce(.zero) { $0 + $1.priceWithTax }
+            totalSaved = savedTotal - boughtTotal
 
             // Check for pending closeout
             pendingCloseout = try rolloverService.evaluateIfNeeded()

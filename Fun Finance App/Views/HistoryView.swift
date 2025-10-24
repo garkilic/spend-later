@@ -7,10 +7,12 @@ struct HistoryView: View {
     private let timeFormatter: DateFormatter
     private let makeDetailViewModel: (WantedItemDisplay) -> ItemDetailViewModel
     private let onItemDeleted: (WantedItemDisplay) -> Void
+    private let onItemUpdated: (WantedItemDisplay) -> Void
 
     init(viewModel: HistoryViewModel,
          makeDetailViewModel: @escaping (WantedItemDisplay) -> ItemDetailViewModel,
-         onItemDeleted: @escaping (WantedItemDisplay) -> Void) {
+         onItemDeleted: @escaping (WantedItemDisplay) -> Void,
+         onItemUpdated: @escaping (WantedItemDisplay) -> Void = { _ in }) {
         _viewModel = StateObject(wrappedValue: viewModel)
         let formatter = DateFormatter()
         formatter.timeStyle = .short
@@ -18,6 +20,7 @@ struct HistoryView: View {
         self.timeFormatter = formatter
         self.makeDetailViewModel = makeDetailViewModel
         self.onItemDeleted = onItemDeleted
+        self.onItemUpdated = onItemUpdated
     }
 
     var body: some View {
@@ -157,6 +160,7 @@ private extension HistoryView {
                 Button {
                     HapticManager.shared.lightImpact()
                     viewModel.markAsBought(item)
+                    onItemUpdated(item)
                 } label: {
                     Label("Bought", systemImage: "checkmark.circle.fill")
                 }
@@ -166,6 +170,7 @@ private extension HistoryView {
                 Button {
                     HapticManager.shared.lightImpact()
                     viewModel.markAsSaved(item)
+                    onItemUpdated(item)
                 } label: {
                     Label("Undo", systemImage: "arrow.uturn.backward")
                 }

@@ -251,21 +251,33 @@ private extension DashboardView {
 
     func itemRow(_ item: WantedItemDisplay) -> some View {
         HStack(spacing: Spacing.sm) {
-            // Icon
-            Image(systemName: "wallet.pass.fill")
+            // Icon - changes based on status
+            Image(systemName: item.isBought ? "cart.fill" : "wallet.pass.fill")
                 .font(.title3)
-                .foregroundColor(Color.accentFallback)
+                .foregroundColor(item.isBought ? Color.warningFallback : Color.accentFallback)
                 .frame(width: 32, height: 32)
-                .background(Color.accentSurfaceFallback)
+                .background(item.isBought ? Color.warningFallback.opacity(0.15) : Color.accentSurfaceFallback)
                 .clipShape(Circle())
 
             // Content
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundColor(Color.primaryFallback)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(item.title)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(item.isBought ? Color.secondaryFallback : Color.primaryFallback)
+                        .lineLimit(1)
+
+                    if item.isBought {
+                        Text("BOUGHT")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.warningFallback)
+                            .cornerRadius(4)
+                    }
+                }
 
                 Text(item.createdAt.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
@@ -274,18 +286,20 @@ private extension DashboardView {
 
             Spacer()
 
-            // Amount
+            // Amount - strikethrough if bought
             Text(CurrencyFormatter.string(from: item.priceWithTax))
                 .font(.body)
                 .fontWeight(.semibold)
                 .monospacedDigit()
-                .foregroundColor(Color.successFallback)
+                .foregroundColor(item.isBought ? Color.secondaryFallback : Color.successFallback)
+                .strikethrough(item.isBought, color: Color.secondaryFallback)
         }
         .padding(Spacing.md)
         .background(Color.surfaceElevatedFallback)
         .cornerRadius(CornerRadius.listRow)
+        .opacity(item.isBought ? 0.7 : 1.0)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.title), saved \(CurrencyFormatter.string(from: item.priceWithTax)), \(item.createdAt.formatted(date: .abbreviated, time: .omitted))")
+        .accessibilityLabel("\(item.title), \(item.isBought ? "bought" : "saved") \(CurrencyFormatter.string(from: item.priceWithTax)), \(item.createdAt.formatted(date: .abbreviated, time: .omitted))")
     }
 
     var addButton: some View {

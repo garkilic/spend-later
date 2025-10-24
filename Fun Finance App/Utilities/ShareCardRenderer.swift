@@ -5,6 +5,9 @@ import UIKit
 @MainActor
 struct ShareCardRenderer {
 
+    // App link - update with actual App Store URL when published
+    private static let appLink = "https://apps.apple.com/app/fun-finance" // TODO: Replace with actual App Store URL
+
     /// Presents a share sheet with a simple text message
     static func share(_ cardType: ShareCardType, from viewController: UIViewController) {
         let message = generateShareMessage(for: cardType)
@@ -26,21 +29,37 @@ struct ShareCardRenderer {
         viewController.present(activityVC, animated: true)
     }
 
-    /// Generates a simple share message
+    /// Generates a clean, engaging share message with app link
     private static func generateShareMessage(for cardType: ShareCardType) -> String {
+        let mainMessage: String
+        let emoji: String
+
         switch cardType {
         case .totalSaved(let amount):
-            return "I've saved \(CurrencyFormatter.string(from: amount)) this month with Spend Later!"
+            emoji = "💰"
+            mainMessage = "I've saved \(CurrencyFormatter.string(from: amount)) this month by resisting impulse purchases!"
         case .temptationsResisted(let count):
-            return "I've resisted \(count) temptation\(count == 1 ? "" : "s") this month with Spend Later!"
+            emoji = "🔥"
+            mainMessage = "I've resisted \(count) temptation\(count == 1 ? "" : "s") this month!"
         case .averagePrice(let amount):
-            return "My average impulse purchase is \(CurrencyFormatter.string(from: amount)) - tracked with Spend Later!"
+            emoji = "📊"
+            mainMessage = "My average impulse buy is \(CurrencyFormatter.string(from: amount)). Tracking helps me save!"
         case .buyersRemorse(let count):
-            return "I've prevented \(count) potential regret\(count == 1 ? "" : "s") this month with Spend Later!"
+            emoji = "✨"
+            mainMessage = "I've prevented \(count) potential regret\(count == 1 ? "" : "s") this month!"
         case .carbonFootprint(let kg):
+            emoji = "🌍"
             let formatted = kg >= 1000 ? String(format: "%.1ft", kg / 1000) : String(format: "%.0fkg", kg)
-            return "I've saved \(formatted) of CO₂ this month with Spend Later!"
+            mainMessage = "I've saved \(formatted) of CO₂ by not buying unnecessary items!"
         }
+
+        // Clean, simple format with app link
+        return """
+        \(emoji) \(mainMessage)
+
+        Track your impulse purchases and build better habits:
+        \(appLink)
+        """
     }
 }
 
