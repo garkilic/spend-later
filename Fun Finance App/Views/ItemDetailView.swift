@@ -91,14 +91,17 @@ struct ItemDetailView: View {
         ToolbarItem(placement: .cancellationAction) {
             if isEditing {
                 Button("Cancel") { cancelEditing() }
+                    .foregroundColor(Color.primaryFallback)
             }
         }
         ToolbarItem(placement: .primaryAction) {
             if isEditing {
                 Button("Save") { saveChanges() }
                     .disabled(viewModel.isSaving)
+                    .foregroundColor(Color.primaryFallback)
             } else {
                 Button("Edit") { isEditing = true }
+                    .foregroundColor(Color.primaryFallback)
             }
         }
     }

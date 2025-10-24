@@ -21,6 +21,8 @@ struct StatDetailView: View {
     let type: StatType
     let viewModel: DashboardViewModel
 
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -40,8 +42,11 @@ struct StatDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryFallback)
                 }
             }
+            .toolbarBackground(Color.surfaceElevatedFallback, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 

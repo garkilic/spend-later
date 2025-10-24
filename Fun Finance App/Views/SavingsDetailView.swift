@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SavingsDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) var colorScheme
     let viewModel: DashboardViewModel
 
     var body: some View {
@@ -24,8 +25,11 @@ struct SavingsDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryFallback)
                 }
             }
+            .toolbarBackground(Color.surfaceElevatedFallback, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 

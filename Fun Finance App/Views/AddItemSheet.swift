@@ -47,6 +47,7 @@ struct AddItemSheet: View {
                         viewModel.clear()
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryFallback)
                     .disabled(viewModel.isFetchingPreview || viewModel.isProcessingImage)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -63,6 +64,7 @@ struct AddItemSheet: View {
                                 // Removed paywall logic for non-monetization version
                             }
                         }
+                        .foregroundColor(Color.primaryFallback)
                         .disabled(!canSave || viewModel.isFetchingPreview)
                     }
                 }
@@ -587,8 +589,11 @@ private struct PhotoSourceSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundColor(Color.primaryFallback)
                 }
             }
+            .toolbarBackground(Color.surfaceElevatedFallback, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 }
