@@ -3,8 +3,18 @@ import SwiftUI
 // MARK: - Color Tokens
 extension Color {
     // Semantic colors with light/dark mode support using UIColor for reliability
-    static let appPrimary = Color(uiColor: .label)
-    static let appSecondary = Color(uiColor: .secondaryLabel)
+    // Primary text: WHITE in dark mode, BLACK in light mode
+    static let appPrimary = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor.white  // Dark mode: white text
+            : UIColor.black  // Light mode: black text
+    })
+    // Secondary text: Light gray in dark mode, dark gray in light mode
+    static let appSecondary = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.7, alpha: 1.0)  // Dark mode: light gray
+            : UIColor(white: 0.4, alpha: 1.0)  // Light mode: dark gray
+    })
     static let appSuccess = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.2, green: 0.8, blue: 0.5, alpha: 1.0)

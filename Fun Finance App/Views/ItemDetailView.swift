@@ -254,7 +254,7 @@ private extension ItemDetailView {
                             .overlay(
                                 Image(systemName: "photo")
                                     .font(.largeTitle)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.secondaryFallback)
                             )
                     } else if let image = imageProvider(viewModel.item) {
                         Image(uiImage: image)
@@ -269,7 +269,7 @@ private extension ItemDetailView {
                             .overlay(
                                 Image(systemName: "photo")
                                     .font(.largeTitle)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.secondaryFallback)
                             )
                     }
                 }
@@ -302,7 +302,7 @@ private extension ItemDetailView {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(CurrencyFormatter.string(from: viewModel.item.price))
                         .font(.title3)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primaryFallback)
                     if viewModel.item.priceWithTax != viewModel.item.price {
                         Text("With tax: \(CurrencyFormatter.string(from: viewModel.item.priceWithTax))")
                             .font(.footnote)
@@ -336,7 +336,7 @@ private extension ItemDetailView {
                 ZStack(alignment: .topLeading) {
                     if viewModel.notes.isEmpty {
                         Text("Add notes...")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.secondaryFallback)
                             .padding(.top, 8)
                             .padding(.leading, 4)
                     }
@@ -348,7 +348,7 @@ private extension ItemDetailView {
                 VStack(alignment: .leading, spacing: 4) {
                     if let notes = viewModel.item.notes, !notes.isEmpty {
                         Text(notes)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.primaryFallback)
                             .multilineTextAlignment(.leading)
                     } else {
                         Text("No notes")
